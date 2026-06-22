@@ -1,0 +1,13 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Quasar (Vue 3), Google Drive API
+  All data is stored in the logged-in user's Google Drive
+  Google OAuth is used for authentication
+
+rules:
+  proposal:
+    - 所有規格書使用繁體中文撰寫
+    - 規格書需包含資料結構及完整詳細的使用情境
+  archive:
+    - 封存前必須先將 change delta 同步至主規格檔案（不傳遞 --skip-specs）
