@@ -54,7 +54,13 @@
               size="sm"
               class="q-mr-sm"
             />
-            <span>{{ props.row.name }}</span>
+            <a
+              class="text-primary cursor-pointer"
+              style="text-decoration: none"
+              @click="openFile(props.row)"
+            >
+              {{ props.row.name }}
+            </a>
           </div>
         </q-td>
       </template>
@@ -158,10 +164,12 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useProjectStore } from '@/stores/projectStore.js'
 import { useDriveStorage } from '@/composables/useDriveStorage.js'
+import { useGoogleAuth } from '@/composables/useGoogleAuth.js'
 import { useQuasar } from 'quasar'
 
 const route = useRoute()
 const $q = useQuasar()
+const { user } = useGoogleAuth()
 const projectStore = useProjectStore()
 const {
   listProjectFilesByCategory,
@@ -242,6 +250,14 @@ function formatDate(dateStr) {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+function openFile(file) {
+  const baseUrl = file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`
+  const url = user.value?.email
+    ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}authuser=${encodeURIComponent(user.value.email)}`
+    : baseUrl
+  window.open(url, '_blank')
 }
 
 function triggerUpload() {
