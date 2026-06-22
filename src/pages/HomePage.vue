@@ -23,13 +23,6 @@
             label="聯絡人管理"
             to="/contacts"
           />
-          <q-btn
-            color="accent"
-            size="lg"
-            icon="cloud"
-            label="雲端硬碟"
-            to="/drive"
-          />
         </div>
       </template>
     </div>

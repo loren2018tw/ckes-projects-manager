@@ -45,7 +45,7 @@ export default defineConfig((/* ctx */) => {
       vueRouterMode: 'hash', // available values: 'hash', 'history'
       // vueRouterBase,
       // vueDevtools,
-      publicPath: process.env.PUBLIC_PATH || '/',
+      publicPath: process.env.PUBLIC_PATH || '/'
 
       // define: {},
       // defineEnv: {}

@@ -253,7 +253,8 @@ function formatDate(dateStr) {
 }
 
 function openFile(file) {
-  const baseUrl = file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`
+  const baseUrl =
+    file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`
   const url = user.value?.email
     ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}authuser=${encodeURIComponent(user.value.email)}`
     : baseUrl

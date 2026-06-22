@@ -6,7 +6,8 @@ const APP_FOLDER_NAME = 'ckes-projects-manager'
 const FILE_NAMES = {
   contacts: 'ckes_contacts.json',
   projects: 'ckes_projects.json',
-  projectStaff: 'ckes_project_staff.json'
+  projectStaff: 'ckes_project_staff.json',
+  purchaseRequests: 'ckes_purchase_requests.json'
 }
 
 const loadingCount = ref(0)

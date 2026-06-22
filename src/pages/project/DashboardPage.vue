@@ -2,12 +2,28 @@
   <div class="q-pa-md">
     <div class="text-h5 q-mb-md">儀表板</div>
 
-    <div v-if="projectData?.budget" class="q-mb-md">
+    <div v-if="projectData" class="q-mb-md">
       <q-card flat bordered>
-        <q-card-section class="row items-center">
-          <div class="text-h6 q-mr-sm">核定金額</div>
+        <q-card-section class="row items-center q-gutter-md">
+          <div class="text-h6">核定金額</div>
           <div class="text-h5 text-primary text-weight-bold">
-            NT$ {{ Number(projectData.budget).toLocaleString() }}
+            NT$ {{ Number(projectData.budget || 0).toLocaleString() }}
+          </div>
+          <q-separator vertical />
+          <div class="text-h6">已動支金額</div>
+          <div class="text-h5 text-negative text-weight-bold">
+            NT$ {{ disbursedAmount.toLocaleString() }}
+          </div>
+          <q-separator vertical />
+          <div class="text-h6">剩餘經費</div>
+          <div
+            :class="[
+              'text-h5',
+              'text-weight-bold',
+              remainingAmount >= 0 ? 'text-positive' : 'text-negative'
+            ]"
+          >
+            NT$ {{ remainingAmount.toLocaleString() }}
           </div>
         </q-card-section>
       </q-card>
@@ -121,11 +137,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useProjectStore } from '@/stores/projectStore.js'
+import { usePurchaseRequestStore } from '@/stores/purchaseRequestStore.js'
 import { useTaskStore } from '@/stores/taskStore.js'
 import { useDriveStorage } from '@/composables/useDriveStorage.js'
 
 const route = useRoute()
 const projectStore = useProjectStore()
+const purchaseRequestStore = usePurchaseRequestStore()
 const taskStore = useTaskStore()
 const { listProjectFilesByCategory, loading } = useDriveStorage()
 
@@ -149,6 +167,28 @@ const overdueCount = computed(
   () =>
     tasks.value.filter(t => !t.completedDate && isOverdue(t.deadline)).length
 )
+
+const remainingAmount = computed(() => {
+  return (Number(projectData.value?.budget) || 0) - disbursedAmount.value
+})
+
+const disbursedAmount = computed(() => {
+  return purchaseRequestStore.requests
+    .filter(r => r.fundProjectId === projectId.value)
+    .reduce((sum, r) => {
+      if (
+        r.manualAmount !== null &&
+        r.manualAmount !== undefined &&
+        r.manualAmount !== ''
+      ) {
+        return sum + Number(r.manualAmount)
+      }
+      const itemsTotal = (r.items || []).reduce((s, item) => {
+        return s + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
+      }, 0)
+      return sum + itemsTotal
+    }, 0)
+})
 
 const dueSoonTasks = computed(() =>
   tasks.value
@@ -210,6 +250,10 @@ async function loadResourceStats() {
 
 onMounted(async () => {
   await projectStore.load()
-  await Promise.all([loadResourceStats(), taskStore.load(projectId.value)])
+  await Promise.all([
+    loadResourceStats(),
+    taskStore.load(projectId.value),
+    purchaseRequestStore.load()
+  ])
 })
 </script>

@@ -7,6 +7,10 @@ const routes = [
       { path: 'contacts', component: () => import('@/pages/ContactList.vue') },
       { path: 'projects', component: () => import('@/pages/ProjectList.vue') },
       {
+        path: 'purchase-requests',
+        component: () => import('@/pages/PurchaseRequestManagement.vue')
+      },
+      {
         path: 'projects/:projectId',
         component: () => import('@/pages/project/DashboardPage.vue')
       },

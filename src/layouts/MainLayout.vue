@@ -110,6 +110,13 @@
             </q-item-section>
             <q-item-section>聯絡人管理</q-item-section>
           </q-item>
+
+          <q-item v-if="isAuthenticated" clickable to="/purchase-requests">
+            <q-item-section avatar>
+              <q-icon name="receipt" />
+            </q-item-section>
+            <q-item-section>請購單管理</q-item-section>
+          </q-item>
         </template>
       </q-list>
     </q-drawer>
