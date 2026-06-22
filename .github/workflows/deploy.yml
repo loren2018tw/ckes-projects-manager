@@ -1,0 +1,47 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Create .env from secrets
+        run: echo "QCLI_GOOGLE_CLIENT_ID=${{ secrets.QCLI_GOOGLE_CLIENT_ID }}" > .env
+
+      - run: npm ci
+
+      - name: Build with GitHub Pages base path
+        run: npm run build
+        env:
+          PUBLIC_PATH: /${{ github.event.repository.name }}/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/spa
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
