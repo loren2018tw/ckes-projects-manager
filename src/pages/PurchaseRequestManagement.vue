@@ -49,7 +49,13 @@
             @click="doDuplicate"
             class="q-mr-sm"
           />
-          <q-btn color="grey" icon="print" label="列印請購單" disabled />
+          <q-btn
+            color="grey"
+            icon="print"
+            label="列印請購單"
+            :disable="!selectedRequest"
+            @click="doPrint"
+          />
         </div>
 
         <q-table
@@ -290,6 +296,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { usePurchaseRequestStore } from '@/stores/purchaseRequestStore.js'
 import { useProjectStore } from '@/stores/projectStore.js'
+import { downloadOdt } from '@/utils/purchasePrint.js'
 
 const store = usePurchaseRequestStore()
 const projectStore = useProjectStore()
@@ -481,6 +488,15 @@ async function doDuplicate() {
     if (newRequest) {
       selectedRequestId.value = newRequest.id
     }
+  }
+}
+
+async function doPrint() {
+  if (!selectedRequest.value) return
+  try {
+    await downloadOdt(selectedRequest.value)
+  } catch (err) {
+    console.error('列印失敗', err)
   }
 }
 
