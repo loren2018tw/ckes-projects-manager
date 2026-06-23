@@ -183,11 +183,13 @@ function confirmDelete() {
 async function closeProject() {
   await projectStore.closeProject(props.projectId)
   form.value.status = 'closed'
+  emit('saved')
 }
 
 async function reopenProject() {
   await projectStore.reopenProject(props.projectId)
   form.value.status = 'active'
+  emit('saved')
 }
 
 async function addStaff(contact) {

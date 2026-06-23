@@ -14,7 +14,7 @@ const loadingCount = ref(0)
 const loading = computed(() => loadingCount.value > 0)
 const driveError = ref(null)
 
-async function driveFetch(url, token, options = {}) {
+async function driveFetch(url, token, options = {}, retried = false) {
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -23,6 +23,13 @@ async function driveFetch(url, token, options = {}) {
     }
   })
   if (res.status === 401 || res.status === 403) {
+    if (!retried) {
+      const { silentRefreshToken } = useGoogleAuth()
+      const newToken = await silentRefreshToken()
+      if (newToken) {
+        return driveFetch(url, newToken, options, true)
+      }
+    }
     const { signOut } = useGoogleAuth()
     signOut()
     window.location.hash = '#/'
@@ -145,14 +152,19 @@ async function ensureFile(fileName, token) {
 export function useDriveStorage() {
   const { accessToken } = useGoogleAuth()
 
-  function getToken() {
-    const tok = accessToken.value
-    if (!tok) throw new Error('Not authenticated')
-    return tok
+  async function getToken() {
+    let tok = accessToken.value
+    if (tok) return tok
+    const { silentRefreshToken, signOut } = useGoogleAuth()
+    tok = await silentRefreshToken()
+    if (tok) return tok
+    signOut()
+    window.location.hash = '#/'
+    throw new Error('Not authenticated')
   }
 
   async function readData(dataType) {
-    const tok = getToken()
+    const tok = await getToken()
     const fileName = FILE_NAMES[dataType]
     if (!fileName) throw new Error(`Unknown data type: ${dataType}`)
 
@@ -173,7 +185,7 @@ export function useDriveStorage() {
   }
 
   async function writeData(dataType, data) {
-    const tok = getToken()
+    const tok = await getToken()
     const fileName = FILE_NAMES[dataType]
     if (!fileName) throw new Error(`Unknown data type: ${dataType}`)
 
@@ -199,7 +211,7 @@ export function useDriveStorage() {
   }
 
   async function listFolderItems(folderId) {
-    const tok = getToken()
+    const tok = await getToken()
 
     loadingCount.value++
     driveError.value = null
@@ -218,7 +230,7 @@ export function useDriveStorage() {
   }
 
   async function readProjectData(projectId, projectName, dataType) {
-    const tok = getToken()
+    const tok = await getToken()
     const fileName = `ckes_${dataType}.json`
     loadingCount.value++
     driveError.value = null
@@ -243,7 +255,7 @@ export function useDriveStorage() {
   }
 
   async function writeProjectData(projectId, projectName, dataType, data) {
-    const tok = getToken()
+    const tok = await getToken()
     const fileName = `ckes_${dataType}.json`
     loadingCount.value++
     driveError.value = null
@@ -273,13 +285,13 @@ export function useDriveStorage() {
   }
 
   async function listAppFolder() {
-    const tok = getToken()
+    const tok = await getToken()
     const appFolderId = await ensureAppFolder(tok)
     return listFolderItems(appFolderId)
   }
 
   async function ensureProjectFolder(projectId, projectName) {
-    const tok = getToken()
+    const tok = await getToken()
     const cacheKey = `project_folder_${projectId}`
     const cached = getCache(cacheKey)
     if (cached) return cached
@@ -318,7 +330,7 @@ export function useDriveStorage() {
   }
 
   async function deleteProjectFolder(projectId, projectName) {
-    const tok = getToken()
+    const tok = await getToken()
     const cacheKey = `project_folder_${projectId}`
 
     try {
@@ -349,7 +361,7 @@ export function useDriveStorage() {
   }
 
   async function renameProjectFolder(projectId, oldName, newName) {
-    const tok = getToken()
+    const tok = await getToken()
     const cacheKey = `project_folder_${projectId}`
     removeCache(cacheKey)
 
@@ -395,7 +407,7 @@ export function useDriveStorage() {
   }
 
   async function uploadFileToFolder(folderId, file) {
-    const tok = getToken()
+    const tok = await getToken()
 
     loadingCount.value++
     driveError.value = null
@@ -430,7 +442,7 @@ export function useDriveStorage() {
   }
 
   async function ensureProjectSubfolder(projectId, projectName, subfolderName) {
-    const tok = getToken()
+    const tok = await getToken()
     const projectFolderId = await ensureProjectFolder(projectId, projectName)
     const cacheKey = `project_subfolder_${projectId}_${subfolderName}`
     const cached = getCache(cacheKey)
@@ -524,7 +536,7 @@ export function useDriveStorage() {
   }
 
   async function downloadFile(fileId) {
-    const tok = getToken()
+    const tok = await getToken()
 
     loadingCount.value++
     driveError.value = null
@@ -543,7 +555,7 @@ export function useDriveStorage() {
   }
 
   async function deleteDriveFile(fileId) {
-    const tok = getToken()
+    const tok = await getToken()
 
     loadingCount.value++
     driveError.value = null

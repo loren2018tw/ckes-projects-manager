@@ -20,7 +20,10 @@ export const usePurchaseRequestStore = defineStore('purchaseRequest', () => {
   async function load() {
     loadError.value = null
     try {
-      requests.value = await readData('purchaseRequests')
+      const data = await readData('purchaseRequests')
+      requests.value = (Array.isArray(data) ? data : []).sort((a, b) =>
+        (b.date || '').localeCompare(a.date || '')
+      )
     } catch (err) {
       loadError.value = err.message
       requests.value = []

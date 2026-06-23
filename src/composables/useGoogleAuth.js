@@ -5,6 +5,7 @@ const isAuthenticated = ref(false)
 const accessToken = ref(null)
 let tokenClient = null
 let authInProgress = false
+let refreshPromise = null
 
 ;(() => {
   const storedUser = localStorage.getItem('ckes_user_info')
@@ -74,6 +75,61 @@ function requestDriveToken(silent = false) {
   tokenClient.requestAccessToken(silent ? { prompt: '' } : undefined)
 }
 
+async function silentRefreshToken() {
+  if (refreshPromise) return refreshPromise
+
+  refreshPromise = new Promise(resolve => {
+    if (typeof google === 'undefined') {
+      resolve(null)
+      return
+    }
+    if (!tokenClient) {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: import.meta.env.QCLI_GOOGLE_CLIENT_ID,
+        scope:
+          'openid email profile https://www.googleapis.com/auth/drive.file',
+        callback: handleTokenResponse,
+        error_callback: () => {
+          authInProgress = false
+        }
+      })
+    }
+    if (authInProgress) {
+      resolve(null)
+      return
+    }
+
+    const origCallback = tokenClient.callback
+    const origErrorCallback = tokenClient.error_callback
+
+    authInProgress = true
+    tokenClient.callback = response => {
+      tokenClient.callback = origCallback
+      tokenClient.error_callback = origErrorCallback
+      authInProgress = false
+      if (response.access_token) {
+        handleTokenResponse(response)
+        resolve(response.access_token)
+      } else {
+        resolve(null)
+      }
+    }
+    tokenClient.error_callback = () => {
+      tokenClient.callback = origCallback
+      tokenClient.error_callback = origErrorCallback
+      authInProgress = false
+      resolve(null)
+    }
+
+    tokenClient.requestAccessToken({ prompt: '' })
+  })
+
+  refreshPromise.finally(() => {
+    refreshPromise = null
+  })
+  return refreshPromise
+}
+
 export function useGoogleAuth() {
   function signIn() {
     requestDriveToken()
@@ -99,6 +155,7 @@ export function useGoogleAuth() {
     accessToken,
     signIn,
     signOut,
-    requestDriveToken
+    requestDriveToken,
+    silentRefreshToken
   }
 }

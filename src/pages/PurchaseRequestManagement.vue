@@ -58,14 +58,26 @@
           />
         </div>
 
+        <div class="row q-mb-sm">
+          <q-select
+            v-model="projectFilter"
+            :options="projectFilterOptions"
+            label="篩選專案"
+            dense
+            outlined
+            emit-value
+            map-options
+            style="min-width: 200px"
+            clearable
+          />
+        </div>
+
         <q-table
-          :rows="store.requests"
+          :rows="filteredRequests"
           :columns="requestColumns"
           row-key="id"
           flat
           bordered
-          :sort-by="'date'"
-          :descending="true"
           @row-click="onRowClick"
         >
           <template v-slot:body="props">
@@ -300,6 +312,32 @@ import { downloadOdt } from '@/utils/purchasePrint.js'
 
 const store = usePurchaseRequestStore()
 const projectStore = useProjectStore()
+
+const projectFilter = ref(null)
+
+const projectFilterOptions = computed(() => {
+  const options = [{ label: '全部請購單', value: null }]
+  for (const p of projectStore.projects) {
+    if (p.status === 'active') {
+      options.push({ label: p.name, value: p.id })
+    }
+  }
+  return options
+})
+
+const sortedRequests = computed(() => {
+  if (!Array.isArray(store.requests)) return []
+  return [...store.requests].sort((a, b) =>
+    (b.date || '').localeCompare(a.date || '')
+  )
+})
+
+const filteredRequests = computed(() => {
+  if (!projectFilter.value) return sortedRequests.value
+  return sortedRequests.value.filter(
+    r => r.fundProjectId === projectFilter.value
+  )
+})
 
 const selectedRequestId = ref(null)
 const selectedRequest = computed(() => {
@@ -571,7 +609,7 @@ watch(
         selectedRequestId.value &&
         requests.some(r => r.id === selectedRequestId.value)
       if (!stillExists) {
-        selectedRequestId.value = requests[0].id
+        selectedRequestId.value = filteredRequests.value[0]?.id
       }
     } else {
       selectedRequestId.value = null
@@ -580,8 +618,21 @@ watch(
   { deep: true }
 )
 
+watch(projectFilter, () => {
+  if (filteredRequests.value.length > 0) {
+    if (!filteredRequests.value.some(r => r.id === selectedRequestId.value)) {
+      selectedRequestId.value = filteredRequests.value[0].id
+    }
+  } else {
+    selectedRequestId.value = null
+  }
+})
+
 onMounted(async () => {
   await Promise.all([store.load(), projectStore.load()])
+  if (filteredRequests.value.length > 0) {
+    selectedRequestId.value = filteredRequests.value[0].id
+  }
 })
 </script>
 
