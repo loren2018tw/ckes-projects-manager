@@ -70,6 +70,42 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
+  async function migrateAssigneeFormat(projectId) {
+    try {
+      const { useProjectStaffStore } =
+        await import('@/stores/projectStaffStore.js')
+      const { useContactStore } = await import('@/stores/contactStore.js')
+      const staffStore = useProjectStaffStore()
+      const contactStore = useContactStore()
+      if (staffStore.staffList.length === 0) {
+        await staffStore.load()
+      }
+      if (contactStore.contacts.length === 0) {
+        await contactStore.load()
+      }
+      const projectStaff = staffStore.byProject(projectId)
+      if (projectStaff.length === 0) return
+
+      let migrated = false
+      tasks.value = tasks.value.map(task => {
+        if (!task.assignee) return task
+        const staff = projectStaff.find(s => s.id === task.assignee)
+        if (staff) {
+          migrated = true
+          const contact = contactStore.find(staff.contactId)
+          return { ...task, assignee: contact ? contact.id : null }
+        }
+        return task
+      })
+
+      if (migrated) {
+        await save(projectId)
+      }
+    } catch {
+      // projectStaffStore no longer exists — migration already done
+    }
+  }
+
   async function load(projectId) {
     loading.value = true
     loadError.value = null
@@ -80,6 +116,7 @@ export const useTaskStore = defineStore('task', () => {
       const data = await readProjectData(projectId, projectName, TASK_DATA_TYPE)
       if (Array.isArray(data)) {
         tasks.value = data.map(migrateLegacyTask)
+        await migrateAssigneeFormat(projectId)
       } else {
         tasks.value = []
       }
@@ -176,6 +213,7 @@ export const useTaskStore = defineStore('task', () => {
     loadError,
     load,
     save,
+    migrateAssigneeFormat,
     add,
     update,
     remove,

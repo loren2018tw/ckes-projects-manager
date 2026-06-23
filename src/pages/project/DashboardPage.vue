@@ -130,6 +130,30 @@
         </q-card>
       </div>
     </div>
+
+    <div class="row q-col-gutter-md q-mt-md">
+      <div class="col-12">
+        <q-card flat bordered>
+          <q-card-section>
+            <div class="text-h6">工作人員</div>
+          </q-card-section>
+          <q-separator />
+          <q-card-section>
+            <div v-if="projectWorkers.length === 0" class="text-grey">
+              尚無工作人員
+            </div>
+            <q-list v-else dense separator>
+              <q-item v-for="worker in projectWorkers" :key="worker.id">
+                <q-item-section>
+                  <q-item-label>{{ worker.name }}</q-item-label>
+                  <q-item-label caption>{{ worker.email }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-card-section>
+        </q-card>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -139,12 +163,14 @@ import { useRoute } from 'vue-router'
 import { useProjectStore } from '@/stores/projectStore.js'
 import { usePurchaseRequestStore } from '@/stores/purchaseRequestStore.js'
 import { useTaskStore } from '@/stores/taskStore.js'
+import { useContactStore } from '@/stores/contactStore.js'
 import { useDriveStorage } from '@/composables/useDriveStorage.js'
 
 const route = useRoute()
 const projectStore = useProjectStore()
 const purchaseRequestStore = usePurchaseRequestStore()
 const taskStore = useTaskStore()
+const contactStore = useContactStore()
 const { listProjectFilesByCategory, loading } = useDriveStorage()
 
 const projectId = computed(() => route.params.projectId)
@@ -154,6 +180,13 @@ const files = ref([])
 const resourceStats = ref([])
 
 const tasks = computed(() => taskStore.tasks)
+
+const projectWorkers = computed(() => {
+  const contactIds = new Set(tasks.value.map(t => t.assignee).filter(Boolean))
+  return Array.from(contactIds)
+    .map(id => contactStore.find(id))
+    .filter(Boolean)
+})
 
 const completedCount = computed(
   () => tasks.value.filter(t => t.status === 'completed').length
@@ -254,7 +287,8 @@ onMounted(async () => {
   await Promise.all([
     loadResourceStats(),
     taskStore.load(projectId.value),
-    purchaseRequestStore.load()
+    purchaseRequestStore.load(),
+    contactStore.load()
   ])
 })
 </script>

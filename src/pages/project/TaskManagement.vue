@@ -301,10 +301,7 @@
                   {{ getContactName(task.assignee).charAt(0) }}
                 </span>
               </div>
-              <div
-                v-if="task.description"
-                class="kanban-card-desc"
-              >
+              <div v-if="task.description" class="kanban-card-desc">
                 {{ task.description }}
               </div>
               <div class="kanban-card-meta">
@@ -465,12 +462,10 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTaskStore } from '@/stores/taskStore.js'
-import { useProjectStaffStore } from '@/stores/projectStaffStore.js'
 import { useContactStore } from '@/stores/contactStore.js'
 
 const route = useRoute()
 const taskStore = useTaskStore()
-const projectStaffStore = useProjectStaffStore()
 const contactStore = useContactStore()
 
 const projectId = computed(() => route.params.projectId)
@@ -478,10 +473,8 @@ const viewMode = ref('kanban')
 
 const dragTask = ref(null)
 
-function getContactName(staffId) {
-  const staff = projectStaffStore.staffList.find(s => s.id === staffId)
-  if (!staff) return null
-  const contact = contactStore.find(staff.contactId)
+function getContactName(contactId) {
+  const contact = contactStore.find(contactId)
   return contact ? contact.name : null
 }
 
@@ -489,11 +482,14 @@ const kanbanColumns = computed(() => {
   const blocked = taskStore.getBlockedTasks(taskStore.tasks)
   const blockedIds = new Set(blocked.map(t => t.id))
   const byStatus = {
-    not_started: taskStore.getTasksByStatus(taskStore.tasks, 'not_started')
+    not_started: taskStore
+      .getTasksByStatus(taskStore.tasks, 'not_started')
       .filter(t => !blockedIds.has(t.id)),
-    in_progress: taskStore.getTasksByStatus(taskStore.tasks, 'in_progress')
+    in_progress: taskStore
+      .getTasksByStatus(taskStore.tasks, 'in_progress')
       .filter(t => !blockedIds.has(t.id)),
-    completed: taskStore.getTasksByStatus(taskStore.tasks, 'completed')
+    completed: taskStore
+      .getTasksByStatus(taskStore.tasks, 'completed')
       .filter(t => !blockedIds.has(t.id))
   }
   const sortByDeadline = arr =>
@@ -587,20 +583,17 @@ const statusOptions = [
 ]
 
 const assigneeOptions = computed(() => {
-  const staff = projectStaffStore.byProject(projectId.value)
   const taskCounts = {}
   taskStore.tasks.forEach(t => {
     if (t.assignee) {
       taskCounts[t.assignee] = (taskCounts[t.assignee] || 0) + 1
     }
   })
-  return staff.map(s => {
-    const contact = contactStore.find(s.contactId)
-    const name = contact ? contact.name : s.contactId
-    const count = taskCounts[s.id] || 0
+  return contactStore.contacts.map(c => {
+    const count = taskCounts[c.id] || 0
     return {
-      label: count > 0 ? `${name}（${count}）` : name,
-      value: s.id
+      label: count > 0 ? `${c.name}（${count}）` : c.name,
+      value: c.id
     }
   })
 })
@@ -651,7 +644,12 @@ const columns = [
     field: 'completedDate',
     align: 'left'
   },
-  { name: 'description', label: '任務描述', field: 'description', align: 'left' },
+  {
+    name: 'description',
+    label: '任務描述',
+    field: 'description',
+    align: 'left'
+  },
   { name: 'dependency', label: '相依任務', field: 'dependency', align: 'left' },
   { name: 'actions', label: '操作', field: 'actions', align: 'center' }
 ]
@@ -874,9 +872,6 @@ async function doDelete() {
 
 onMounted(async () => {
   await taskStore.load(projectId.value)
-  if (projectStaffStore.staffList.length === 0) {
-    await projectStaffStore.load()
-  }
   if (contactStore.contacts.length === 0) {
     await contactStore.load()
   }

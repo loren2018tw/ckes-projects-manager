@@ -1,28 +1,21 @@
-# project-staff Specification
-
-## Purpose
-
-TBD - created by archiving change project-management-system. Update Purpose after archive.
-
-## Requirements
+## REMOVED Requirements
 
 ### Requirement: 從聯絡人清單加入工作人員
 
-在專案編輯頁面中，使用者可以從系統通用聯絡人清單選取聯絡人，加入為該專案的工作人員。
+**Reason**: 任務負責人改為直接從系統聯絡人清單選取，不再需要手動將聯絡人加入為專案工作人員。工作人員清單改由系統自動從任務負責人彙整。
+
+**Migration**: 任務的 assignee 欄位將從 `staff.id` 改為直接使用 `contact.id`，無需再透過 projectStaffStore 建立關聯。
 
 #### Scenario: 成功加入工作人員
 
 - **WHEN** 使用者在專案編輯頁面點擊「加入工作人員」，從彈出的聯絡人清單中選取一位聯絡人
 - **THEN** 該聯絡人被加入專案工作人員清單，並顯示在編輯頁面中
 
-#### Scenario: 不可重複加入同一位聯絡人
-
-- **WHEN** 使用者嘗試加入已在該專案工作人員清單中的聯絡人
-- **THEN** 系統提示「該聯絡人已是此專案的工作人員」，不重複加入
-
 ### Requirement: 移除工作人員
 
-使用者可以從專案中移除已加入的工作人員。
+**Reason**: 不再需要手動維護工作人員名單，工作人員由系統自動彙整。
+
+**Migration**: 無直接替代。若需將某人從工作人員清單移除，請移除該人員的所有任務指派。
 
 #### Scenario: 成功移除工作人員
 
@@ -31,7 +24,9 @@ TBD - created by archiving change project-management-system. Update Purpose afte
 
 ### Requirement: 檢視專案工作人員
 
-在專案編輯頁面中顯示目前所有已加入的工作人員。
+**Reason**: 工作人員檢視移至專案儀表板，由系統自動彙整。
+
+**Migration**: 移至 `project-dashboard` 規格中的自動彙整工作人員區塊。
 
 #### Scenario: 檢視工作人員清單
 
