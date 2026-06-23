@@ -49,6 +49,12 @@
       row-key="id"
       flat
       bordered
+      :pagination="{
+        sortBy: null,
+        descending: false,
+        page: 1,
+        rowsPerPage: 10
+      }"
     >
       <template v-slot:body-cell-name="props">
         <q-td :props="props">

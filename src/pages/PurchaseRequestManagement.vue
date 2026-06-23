@@ -78,6 +78,12 @@
           row-key="id"
           flat
           bordered
+          :pagination="{
+            sortBy: null,
+            descending: false,
+            page: 1,
+            rowsPerPage: 10
+          }"
           @row-click="onRowClick"
         >
           <template v-slot:body="props">
@@ -121,6 +127,12 @@
           row-key="id"
           flat
           bordered
+          :pagination="{
+            sortBy: null,
+            descending: false,
+            page: 1,
+            rowsPerPage: 10
+          }"
         >
           <template v-slot:body-cell-subtotal="props">
             <q-td :props="props">
