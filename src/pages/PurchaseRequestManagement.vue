@@ -318,10 +318,12 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { usePurchaseRequestStore } from '@/stores/purchaseRequestStore.js'
 import { useProjectStore } from '@/stores/projectStore.js'
 import { downloadOdt } from '@/utils/purchasePrint.js'
 
+const route = useRoute()
 const store = usePurchaseRequestStore()
 const projectStore = useProjectStore()
 
@@ -394,6 +396,7 @@ const requestColumns = [
     align: 'left'
   },
   { name: 'vendor', label: '採購廠商', field: 'vendor', align: 'left' },
+  { name: 'remark', label: '備註', field: 'remark', align: 'left' },
   { name: 'amount', label: '實支金額', field: 'amount', align: 'right' }
 ]
 
@@ -642,6 +645,9 @@ watch(projectFilter, () => {
 
 onMounted(async () => {
   await Promise.all([store.load(), projectStore.load()])
+  if (route.params.projectId) {
+    projectFilter.value = route.params.projectId
+  }
   if (filteredRequests.value.length > 0) {
     selectedRequestId.value = filteredRequests.value[0].id
   }

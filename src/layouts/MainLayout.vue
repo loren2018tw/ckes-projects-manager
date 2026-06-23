@@ -85,6 +85,13 @@
             </q-item-section>
             <q-item-section>任務管理</q-item-section>
           </q-item>
+
+          <q-item clickable :to="`/projects/${projectId}/purchase-requests`">
+            <q-item-section avatar>
+              <q-icon name="receipt" />
+            </q-item-section>
+            <q-item-section>請購單</q-item-section>
+          </q-item>
         </template>
 
         <template v-else>

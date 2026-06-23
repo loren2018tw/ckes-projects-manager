@@ -21,6 +21,10 @@ const routes = [
       {
         path: 'projects/:projectId/tasks',
         component: () => import('@/pages/project/TaskManagement.vue')
+      },
+      {
+        path: 'projects/:projectId/purchase-requests',
+        component: () => import('@/pages/PurchaseRequestManagement.vue')
       }
     ]
   },
