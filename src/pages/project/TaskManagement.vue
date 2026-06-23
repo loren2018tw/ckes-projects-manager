@@ -22,194 +22,319 @@
       {{ taskStore.loadError }}
     </q-banner>
 
-    <q-table
-      :rows="sortedTasks"
-      :columns="columns"
-      row-key="id"
-      flat
-      bordered
-      :loading="taskStore.loading"
-      :hide-pagination="true"
-    >
-      <template v-slot:body-cell-status="props">
-        <q-td :props="props">
-          <q-icon
-            v-if="props.row.completedDate"
-            name="check_circle"
-            color="positive"
-            size="md"
-          />
-          <q-icon
-            v-else-if="isOverdue(props.row.deadline)"
-            name="error"
-            color="negative"
-            size="md"
-          />
-          <q-icon
-            v-else-if="isDueSoon(props.row.deadline)"
-            name="schedule"
-            color="orange"
-            size="md"
-          />
-          <q-icon v-else name="radio_button_unchecked" color="grey" size="md" />
-        </q-td>
-      </template>
+    <div class="row items-center q-mb-sm">
+      <q-btn-toggle
+        v-model="viewMode"
+        :options="[
+          { label: '看板', value: 'kanban' },
+          { label: '列表', value: 'list' }
+        ]"
+        toggle-color="primary"
+        dense
+        flat
+        rounded
+      />
+      <q-space />
+    </div>
 
-      <template v-slot:body-cell-name="props">
-        <q-td :props="props">
-          <span
-            :class="{
-              'text-strikethrough': props.row.completedDate,
-              'text-negative':
-                isOverdue(props.row.deadline) && !props.row.completedDate,
-              'text-orange':
-                isDueSoon(props.row.deadline) && !props.row.completedDate
-            }"
-          >
-            {{ props.row.name }}
-          </span>
-        </q-td>
-      </template>
-
-      <template v-slot:body-cell-deadline="props">
-        <q-td :props="props">
-          <span
-            :class="{
-              'text-negative':
-                isOverdue(props.row.deadline) && !props.row.completedDate,
-              'text-orange':
-                isDueSoon(props.row.deadline) && !props.row.completedDate
-            }"
-          >
-            {{ formatDate(props.row.deadline) }}
-          </span>
-        </q-td>
-      </template>
-
-      <template v-slot:body-cell-completedDate="props">
-        <q-td :props="props">
-          {{ formatDate(props.row.completedDate) }}
-        </q-td>
-      </template>
-
-      <template v-slot:body-cell-dependency="props">
-        <q-td :props="props">
-          <template v-if="props.row.predecessorId">
-            {{ getTaskName(props.row.predecessorId) }}
-            <q-chip size="sm" dense>
-              {{ depLabel(props.row.dependencyType) }}
-            </q-chip>
-          </template>
-          <span v-else class="text-grey">-</span>
-        </q-td>
-      </template>
-
-      <template v-slot:body-cell-actions="props">
-        <q-td :props="props">
-          <q-btn flat round icon="edit" @click="openEditDialog(props.row)">
-            <q-tooltip>編輯</q-tooltip>
-          </q-btn>
-          <q-btn
-            flat
-            round
-            icon="delete"
-            color="negative"
-            @click="confirmDelete(props.row)"
-          >
-            <q-tooltip>刪除</q-tooltip>
-          </q-btn>
-        </q-td>
-      </template>
-
-      <template v-slot:no-data>
-        <div class="text-center q-pa-md text-grey">
-          尚無任務，點擊「新增任務」按鈕建立第一筆任務
-        </div>
-      </template>
-    </q-table>
-
-    <div class="text-h6 q-mt-lg q-mb-sm">甘特圖</div>
-    <div class="gantt-wrap">
-      <div class="gantt-header">
-        <div class="gantt-name-header">任務</div>
-        <div class="gantt-months">
-          <div
-            v-for="m in ganttMonths"
-            :key="m.label"
-            class="gantt-month"
-            :style="{ width: m.width + 'px' }"
-          >
-            {{ m.label }}
-          </div>
-        </div>
-      </div>
-      <div
-        class="gantt-body"
-        :style="{ height: ganttTasks.length * 36 + 'px' }"
+    <template v-if="viewMode === 'list'">
+      <q-table
+        :rows="sortedTasks"
+        :columns="columns"
+        row-key="id"
+        flat
+        bordered
+        :loading="taskStore.loading"
+        :hide-pagination="true"
       >
-        <svg
-          class="gantt-svg"
-          :width="ganttSvgW"
-          :height="ganttTasks.length * 36"
-        >
-          <defs>
-            <marker
-              id="arr"
-              markerWidth="8"
-              markerHeight="6"
-              refX="8"
-              refY="3"
-              orient="auto"
+        <template v-slot:body-cell-status="props">
+          <q-td :props="props">
+            <q-icon
+              v-if="props.row.status === 'completed'"
+              name="check_circle"
+              color="positive"
+              size="md"
+            />
+            <q-icon
+              v-else-if="taskStore.isBlocked(taskStore.tasks, props.row)"
+              name="lock"
+              color="negative"
+              size="md"
+            />
+            <q-icon
+              v-else-if="props.row.status === 'in_progress'"
+              name="schedule"
+              color="primary"
+              size="md"
+            />
+            <q-icon
+              v-else
+              name="radio_button_unchecked"
+              color="grey"
+              size="md"
+            />
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-startDate="props">
+          <q-td :props="props">
+            {{ formatDate(props.row.startDate) }}
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-name="props">
+          <q-td :props="props">
+            <span
+              :class="{
+                'text-strikethrough': props.row.status === 'completed',
+                'text-negative':
+                  isOverdue(props.row.deadline) &&
+                  props.row.status !== 'completed',
+                'text-orange':
+                  isDueSoon(props.row.deadline) &&
+                  props.row.status !== 'completed'
+              }"
             >
-              <polygon points="0 0, 8 3, 0 6" fill="#888" />
-            </marker>
-          </defs>
-          <line
-            v-for="l in ganttTodayLine"
-            :key="'tl'"
-            :x1="l"
-            y1="0"
-            :x2="l"
-            :y2="ganttTasks.length * 36"
-            stroke="#f44336"
-            stroke-width="1"
-            stroke-dasharray="4"
-          />
-          <line
-            v-for="dep in ganttArrows"
-            :key="dep.id"
-            :x1="dep.x1"
-            :y1="dep.y1"
-            :x2="dep.x2"
-            :y2="dep.y2"
-            stroke="#888"
-            stroke-width="1.5"
-            marker-end="url(#arr)"
-          />
-        </svg>
-        <div
-          v-for="(t, i) in ganttTasks"
-          :key="t.id"
-          class="gantt-row"
-          :style="{ top: i * 36 + 'px' }"
-        >
-          <div class="gantt-name">{{ t.name }}</div>
-          <div class="gantt-track">
+              {{ props.row.name }}
+            </span>
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-deadline="props">
+          <q-td :props="props">
+            <span
+              :class="{
+                'text-negative':
+                  isOverdue(props.row.deadline) &&
+                  props.row.status !== 'completed',
+                'text-orange':
+                  isDueSoon(props.row.deadline) &&
+                  props.row.status !== 'completed'
+              }"
+            >
+              {{ formatDate(props.row.deadline) }}
+            </span>
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-completedDate="props">
+          <q-td :props="props">
+            {{ formatDate(props.row.completedDate) }}
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-description="props">
+          <q-td :props="props">
+            <span class="text-grey-8">{{ props.row.description || '-' }}</span>
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-dependency="props">
+          <q-td :props="props">
+            <template v-if="props.row.predecessorId">
+              {{ getTaskName(props.row.predecessorId) }}
+              <q-chip size="sm" dense>
+                {{ depLabel(props.row.dependencyType) }}
+              </q-chip>
+            </template>
+            <span v-else class="text-grey">-</span>
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-actions="props">
+          <q-td :props="props">
+            <q-btn flat round icon="edit" @click="openEditDialog(props.row)">
+              <q-tooltip>編輯</q-tooltip>
+            </q-btn>
+            <q-btn
+              flat
+              round
+              icon="delete"
+              color="negative"
+              @click="confirmDelete(props.row)"
+            >
+              <q-tooltip>刪除</q-tooltip>
+            </q-btn>
+          </q-td>
+        </template>
+
+        <template v-slot:no-data>
+          <div class="text-center q-pa-md text-grey">
+            尚無任務，點擊「新增任務」按鈕建立第一筆任務
+          </div>
+        </template>
+      </q-table>
+
+      <div class="text-h6 q-mt-lg q-mb-sm">甘特圖</div>
+      <div class="gantt-wrap">
+        <div class="gantt-header">
+          <div class="gantt-name-header">任務</div>
+          <div class="gantt-months">
             <div
-              v-if="ganttBar(t).show"
-              class="gantt-bar"
-              :style="ganttBar(t).style"
-              :class="ganttBar(t).cls"
+              v-for="m in ganttMonths"
+              :key="m.label"
+              class="gantt-month"
+              :style="{ width: m.width + 'px' }"
             >
-              <span class="gantt-bar-text">{{ ganttBar(t).label }}</span>
+              {{ m.label }}
             </div>
           </div>
         </div>
-        <div v-if="ganttTasks.length === 0" class="gantt-none"
-          >尚無任務資料</div
+        <div
+          class="gantt-body"
+          :style="{ height: ganttTasks.length * 36 + 'px' }"
         >
+          <svg
+            class="gantt-svg"
+            :width="ganttSvgW"
+            :height="ganttTasks.length * 36"
+          >
+            <defs>
+              <marker
+                id="arr"
+                markerWidth="8"
+                markerHeight="6"
+                refX="8"
+                refY="3"
+                orient="auto"
+              >
+                <polygon points="0 0, 8 3, 0 6" fill="#888" />
+              </marker>
+            </defs>
+            <line
+              v-for="l in ganttTodayLine"
+              :key="'tl'"
+              :x1="l"
+              y1="0"
+              :x2="l"
+              :y2="ganttTasks.length * 36"
+              stroke="#f44336"
+              stroke-width="1"
+              stroke-dasharray="4"
+            />
+            <line
+              v-for="dep in ganttArrows"
+              :key="dep.id"
+              :x1="dep.x1"
+              :y1="dep.y1"
+              :x2="dep.x2"
+              :y2="dep.y2"
+              stroke="#888"
+              stroke-width="1.5"
+              marker-end="url(#arr)"
+            />
+          </svg>
+          <div
+            v-for="(t, i) in ganttTasks"
+            :key="t.id"
+            class="gantt-row"
+            :style="{ top: i * 36 + 'px' }"
+          >
+            <div class="gantt-name">{{ t.name }}</div>
+            <div class="gantt-track">
+              <div
+                v-if="ganttBar(t).show"
+                class="gantt-bar"
+                :style="ganttBar(t).style"
+                :class="ganttBar(t).cls"
+              >
+                <span class="gantt-bar-text">{{ ganttBar(t).label }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="ganttTasks.length === 0" class="gantt-none"
+            >尚無任務資料</div
+          >
+        </div>
       </div>
-    </div>
+    </template>
+
+    <template v-if="viewMode === 'kanban'">
+      <div class="kanban-board">
+        <div
+          v-for="col in kanbanColumns"
+          :key="col.status"
+          class="kanban-column"
+          :class="'kanban-col-' + col.status"
+          @dragover.prevent="onDragOver"
+          @drop="onDrop(col.status)"
+        >
+          <div class="kanban-col-header">
+            <q-icon :name="col.icon" :color="col.color" size="sm" />
+            <span class="kanban-col-title">{{ col.label }}</span>
+            <q-badge :color="col.color" floating>{{
+              col.tasks.length
+            }}</q-badge>
+          </div>
+          <div class="kanban-col-body">
+            <div
+              v-for="task in col.tasks"
+              :key="task.id"
+              class="kanban-card"
+              :class="'kanban-card-' + col.status"
+              draggable="true"
+              @dragstart="onDragStart(task)"
+              @dragend="onDragEnd"
+              @click="openEditDialog(task)"
+            >
+              <div class="kanban-card-top">
+                <span class="kanban-card-name">
+                  <q-icon
+                    v-if="col.status === 'blocked'"
+                    name="lock"
+                    size="xs"
+                    class="q-mr-xs"
+                  />
+                  <q-icon
+                    v-else-if="col.status === 'completed'"
+                    name="check_circle"
+                    size="xs"
+                    class="q-mr-xs"
+                  />
+                  {{ task.name }}
+                </span>
+                <span
+                  v-if="task.assignee && getContactName(task.assignee)"
+                  class="kanban-avatar"
+                  :title="getContactName(task.assignee)"
+                >
+                  {{ getContactName(task.assignee).charAt(0) }}
+                </span>
+              </div>
+              <div
+                v-if="task.description"
+                class="kanban-card-desc"
+              >
+                {{ task.description }}
+              </div>
+              <div class="kanban-card-meta">
+                <span
+                  v-if="task.deadline"
+                  class="kanban-deadline"
+                  :class="{
+                    'text-negative':
+                      isOverdue(task.deadline) && task.status !== 'completed',
+                    'text-orange':
+                      isDueSoon(task.deadline) && task.status !== 'completed'
+                  }"
+                >
+                  截止: {{ formatDate(task.deadline) }}
+                </span>
+                <span
+                  v-if="col.status === 'blocked' && task.predecessorId"
+                  class="kanban-blocked-by"
+                >
+                  相依: {{ getTaskName(task.predecessorId) }}
+                </span>
+              </div>
+            </div>
+            <div v-if="col.tasks.length === 0" class="kanban-empty">
+              {{ col.emptyText }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
 
     <q-dialog v-model="dialog" persistent>
       <q-card style="min-width: 500px">
@@ -228,6 +353,24 @@
           />
 
           <q-input
+            v-model="form.startDate"
+            label="開始日期"
+            outlined
+            dense
+            type="date"
+          />
+
+          <q-select
+            v-model="form.status"
+            :options="statusOptions"
+            label="狀態"
+            outlined
+            dense
+            emit-value
+            map-options
+          />
+
+          <q-input
             v-model="form.deadline"
             label="截止日期"
             outlined
@@ -241,6 +384,26 @@
             outlined
             dense
             type="date"
+          />
+
+          <q-input
+            v-model="form.description"
+            label="任務描述"
+            outlined
+            dense
+            type="textarea"
+            autogrow
+          />
+
+          <q-select
+            v-model="form.assignee"
+            :options="assigneeOptions"
+            label="負責人"
+            outlined
+            dense
+            clearable
+            emit-value
+            map-options
           />
 
           <q-select
@@ -302,11 +465,145 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTaskStore } from '@/stores/taskStore.js'
+import { useProjectStaffStore } from '@/stores/projectStaffStore.js'
+import { useContactStore } from '@/stores/contactStore.js'
 
 const route = useRoute()
 const taskStore = useTaskStore()
+const projectStaffStore = useProjectStaffStore()
+const contactStore = useContactStore()
 
 const projectId = computed(() => route.params.projectId)
+const viewMode = ref('kanban')
+
+const dragTask = ref(null)
+
+function getContactName(staffId) {
+  const staff = projectStaffStore.staffList.find(s => s.id === staffId)
+  if (!staff) return null
+  const contact = contactStore.find(staff.contactId)
+  return contact ? contact.name : null
+}
+
+const kanbanColumns = computed(() => {
+  const blocked = taskStore.getBlockedTasks(taskStore.tasks)
+  const blockedIds = new Set(blocked.map(t => t.id))
+  const byStatus = {
+    not_started: taskStore.getTasksByStatus(taskStore.tasks, 'not_started')
+      .filter(t => !blockedIds.has(t.id)),
+    in_progress: taskStore.getTasksByStatus(taskStore.tasks, 'in_progress')
+      .filter(t => !blockedIds.has(t.id)),
+    completed: taskStore.getTasksByStatus(taskStore.tasks, 'completed')
+      .filter(t => !blockedIds.has(t.id))
+  }
+  const sortByDeadline = arr =>
+    [...arr].sort((a, b) => {
+      if (!a.deadline) return 1
+      if (!b.deadline) return -1
+      return new Date(a.deadline) - new Date(b.deadline)
+    })
+  return [
+    {
+      status: 'blocked',
+      label: '被阻擋',
+      icon: 'lock',
+      color: 'negative',
+      tasks: sortByDeadline(blocked),
+      emptyText: '尚無被阻擋的任務'
+    },
+    {
+      status: 'not_started',
+      label: '未開始',
+      icon: 'radio_button_unchecked',
+      color: 'grey',
+      tasks: sortByDeadline(byStatus.not_started),
+      emptyText: '尚無未開始的任務'
+    },
+    {
+      status: 'in_progress',
+      label: '進行中',
+      icon: 'schedule',
+      color: 'primary',
+      tasks: sortByDeadline(byStatus.in_progress),
+      emptyText: '尚無進行中的任務'
+    },
+    {
+      status: 'completed',
+      label: '已完成',
+      icon: 'check_circle',
+      color: 'positive',
+      tasks: sortByDeadline(byStatus.completed),
+      emptyText: '尚無已完成的任務'
+    }
+  ]
+})
+
+function onDragStart(task) {
+  dragTask.value = task
+}
+
+function onDragEnd() {
+  dragTask.value = null
+}
+
+function onDragOver(e) {
+  e.dataTransfer.dropEffect = 'move'
+}
+
+async function onDrop(targetStatus) {
+  if (!dragTask.value) return
+  if (targetStatus === 'blocked') {
+    const { useQuasar } = await import('quasar')
+    useQuasar().notify({
+      type: 'warning',
+      message: '被阻擋狀態為自動判定，無法手動設定'
+    })
+    dragTask.value = null
+    return
+  }
+  const statusMap = {
+    not_started: 'not_started',
+    in_progress: 'in_progress',
+    completed: 'completed'
+  }
+  const newStatus = statusMap[targetStatus]
+  if (newStatus && dragTask.value.status !== newStatus) {
+    const fields = { status: newStatus }
+    if (newStatus === 'completed' && !dragTask.value.completedDate) {
+      fields.completedDate = new Date().toISOString().slice(0, 10)
+    }
+    if (newStatus === 'not_started') {
+      fields.completedDate = null
+    }
+    await taskStore.update(projectId.value, dragTask.value.id, fields)
+  }
+  dragTask.value = null
+}
+
+const statusOptions = [
+  { label: '未開始', value: 'not_started' },
+  { label: '進行中', value: 'in_progress' },
+  { label: '已完成', value: 'completed' }
+]
+
+const assigneeOptions = computed(() => {
+  const staff = projectStaffStore.byProject(projectId.value)
+  const taskCounts = {}
+  taskStore.tasks.forEach(t => {
+    if (t.assignee) {
+      taskCounts[t.assignee] = (taskCounts[t.assignee] || 0) + 1
+    }
+  })
+  return staff.map(s => {
+    const contact = contactStore.find(s.contactId)
+    const name = contact ? contact.name : s.contactId
+    const count = taskCounts[s.id] || 0
+    return {
+      label: count > 0 ? `${name}（${count}）` : name,
+      value: s.id
+    }
+  })
+})
 const dialog = ref(false)
 const deleteDialog = ref(false)
 const editingTask = ref(null)
@@ -315,8 +612,12 @@ const nameInput = ref(null)
 
 const form = ref({
   name: '',
+  startDate: '',
+  status: 'not_started',
   deadline: '',
   completedDate: '',
+  description: '',
+  assignee: null,
   predecessorId: null,
   dependencyType: null
 })
@@ -342,6 +643,7 @@ const columns = [
     align: 'left',
     sortable: true
   },
+  { name: 'startDate', label: '開始日期', field: 'startDate', align: 'left' },
   { name: 'deadline', label: '截止日期', field: 'deadline', align: 'left' },
   {
     name: 'completedDate',
@@ -349,6 +651,7 @@ const columns = [
     field: 'completedDate',
     align: 'left'
   },
+  { name: 'description', label: '任務描述', field: 'description', align: 'left' },
   { name: 'dependency', label: '相依任務', field: 'dependency', align: 'left' },
   { name: 'actions', label: '操作', field: 'actions', align: 'center' }
 ]
@@ -449,8 +752,12 @@ function formatDate(dateStr) {
 function resetForm() {
   form.value = {
     name: '',
+    startDate: '',
+    status: 'not_started',
     deadline: '',
     completedDate: '',
+    description: '',
+    assignee: null,
     predecessorId: null,
     dependencyType: null
   }
@@ -467,8 +774,12 @@ function openEditDialog(task) {
   editingTask.value = task
   form.value = {
     name: task.name,
+    startDate: task.startDate || '',
+    status: task.status || 'not_started',
     deadline: task.deadline || '',
     completedDate: task.completedDate || '',
+    description: task.description || '',
+    assignee: task.assignee || null,
     predecessorId: task.predecessorId || null,
     dependencyType: task.dependencyType || null
   }
@@ -493,26 +804,57 @@ async function saveTask() {
     }
   }
 
-  if (editingTask.value) {
-    await taskStore.update(projectId.value, editingTask.value.id, {
-      name: form.value.name.trim(),
-      deadline: form.value.deadline || null,
-      completedDate: form.value.completedDate || null,
-      predecessorId: form.value.predecessorId,
-      dependencyType: form.value.predecessorId
-        ? form.value.dependencyType
-        : null
+  const autoCompletedDate =
+    form.value.status === 'completed'
+      ? new Date().toISOString().slice(0, 10)
+      : null
+  const clearedCompletedDate =
+    form.value.status === 'not_started' ? null : undefined
+  const finalCompletedDate =
+    autoCompletedDate ||
+    (clearedCompletedDate === null ? null : form.value.completedDate || null)
+
+  const taskData = {
+    name: form.value.name.trim(),
+    startDate: form.value.startDate || null,
+    status: form.value.status,
+    deadline: form.value.deadline || null,
+    completedDate: finalCompletedDate,
+    description: form.value.description || '',
+    assignee: form.value.assignee || null,
+    predecessorId: form.value.predecessorId,
+    dependencyType: form.value.predecessorId ? form.value.dependencyType : null
+  }
+
+  const validation = taskStore.validateTask(taskStore.tasks, {
+    ...taskData,
+    id: editingTask.value?.id || 'pending'
+  })
+  if (!validation.valid) {
+    const { useQuasar } = await import('quasar')
+    useQuasar().notify({
+      type: 'negative',
+      message: validation.message
     })
+    if (validation.adjust) {
+      if (
+        form.value.startDate &&
+        form.value.deadline &&
+        form.value.startDate > form.value.deadline
+      ) {
+        form.value.deadline = form.value.startDate
+        taskData.deadline = form.value.startDate
+      }
+    }
+    return
+  }
+
+  if (editingTask.value) {
+    await taskStore.update(projectId.value, editingTask.value.id, taskData)
   } else {
     await taskStore.add(projectId.value, {
       id: taskStore.generateId(),
-      name: form.value.name.trim(),
-      deadline: form.value.deadline || null,
-      completedDate: form.value.completedDate || null,
-      predecessorId: form.value.predecessorId,
-      dependencyType: form.value.predecessorId
-        ? form.value.dependencyType
-        : null
+      ...taskData
     })
   }
 
@@ -532,6 +874,12 @@ async function doDelete() {
 
 onMounted(async () => {
   await taskStore.load(projectId.value)
+  if (projectStaffStore.staffList.length === 0) {
+    await projectStaffStore.load()
+  }
+  if (contactStore.contacts.length === 0) {
+    await contactStore.load()
+  }
 })
 
 const _today = new Date()
@@ -540,7 +888,7 @@ _today.setHours(0, 0, 0, 0)
 const _ganttMin = computed(() => {
   let min = null
   for (const t of sortedTasks.value) {
-    for (const d of [t.deadline, t.completedDate]) {
+    for (const d of [t.startDate, t.deadline, t.completedDate]) {
       if (!d) continue
       const dt = new Date(d)
       if (!min || dt < min) min = dt
@@ -554,7 +902,7 @@ const _ganttMin = computed(() => {
 const _ganttMax = computed(() => {
   let max = null
   for (const t of sortedTasks.value) {
-    for (const d of [t.deadline, t.completedDate]) {
+    for (const d of [t.deadline, t.completedDate, t.startDate]) {
       if (!d) continue
       const dt = new Date(d)
       if (!max || dt > max) max = dt
@@ -649,14 +997,14 @@ function _ganttEndX(task) {
 }
 
 function _ganttStartX(task) {
-  const end = task.deadline
-    ? new Date(task.deadline)
-    : task.completedDate
-      ? new Date(task.completedDate)
-      : null
-  if (!end) return _ganttLabelW
-  const start = new Date(end)
-  start.setDate(start.getDate() - 7)
+  const start = task.startDate
+    ? new Date(task.startDate)
+    : task.deadline
+      ? new Date(new Date(task.deadline).getTime() - 7 * 864e5)
+      : task.completedDate
+        ? new Date(new Date(task.completedDate).getTime() - 7 * 864e5)
+        : null
+  if (!start) return _ganttLabelW
   if (task.predecessorId) {
     const pred = ganttTasks.value.find(p => p.id === task.predecessorId)
     if (pred) {
@@ -665,7 +1013,7 @@ function _ganttStartX(task) {
         : pred.deadline
           ? new Date(pred.deadline)
           : null
-      if (pe && pe < end) start.setTime(pe.getTime())
+      if (pe && pe < start) start.setTime(pe.getTime())
     }
   }
   const off = Math.max(0, Math.round((start - _ganttMin.value) / 864e5))
@@ -679,8 +1027,9 @@ function ganttBar(task) {
       ? new Date(task.deadline)
       : null
   if (!end) return { show: false }
-  const start = new Date(end)
-  start.setDate(start.getDate() - 7)
+  const start = task.startDate
+    ? new Date(task.startDate)
+    : new Date(end.getTime() - 7 * 864e5)
   if (task.predecessorId) {
     const pred = ganttTasks.value.find(p => p.id === task.predecessorId)
     if (pred) {
@@ -697,15 +1046,16 @@ function ganttBar(task) {
     _ganttDays.value,
     Math.round((end - _ganttMin.value) / 864e5)
   )
-  const cls = task.completedDate
-    ? 'bar-done'
-    : !task.deadline
-      ? 'bar-planned'
-      : new Date(task.deadline) < _today
-        ? 'bar-overdue'
-        : (new Date(task.deadline) - _today) / 864e5 <= 7
-          ? 'bar-warn'
-          : 'bar-ok'
+  const cls =
+    task.status === 'completed'
+      ? 'bar-done'
+      : !task.deadline
+        ? 'bar-planned'
+        : new Date(task.deadline) < _today
+          ? 'bar-overdue'
+          : (new Date(task.deadline) - _today) / 864e5 <= 7
+            ? 'bar-warn'
+            : 'bar-ok'
   return {
     show: true,
     style: {
@@ -713,7 +1063,7 @@ function ganttBar(task) {
       width: Math.max(10, (de - ds) * _ganttDw.value) + 'px'
     },
     cls,
-    label: task.completedDate ? '✓ ' + task.name : task.name
+    label: task.status === 'completed' ? '✓ ' + task.name : task.name
   }
 }
 </script>
@@ -834,5 +1184,143 @@ function ganttBar(task) {
   left: 210px;
   color: #999;
   font-size: 13px;
+}
+
+.kanban-board {
+  display: flex;
+  gap: 12px;
+  min-height: 400px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+}
+
+.kanban-column {
+  flex: 1;
+  min-width: 220px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-col-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.kanban-col-title {
+  flex: 1;
+}
+
+.kanban-col-body {
+  padding: 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kanban-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s,
+    opacity 0.15s;
+}
+
+.kanban-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.kanban-card[draggable='true']:active {
+  opacity: 0.5;
+}
+
+.kanban-card-blocked {
+  border-left: 3px solid #f44336;
+}
+
+.kanban-card-not_started {
+  border-left: 3px solid #9e9e9e;
+}
+
+.kanban-card-in_progress {
+  border-left: 3px solid #2196f3;
+}
+
+.kanban-card-completed {
+  border-left: 3px solid #4caf50;
+}
+
+.kanban-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kanban-card-name {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #1976d2;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.kanban-card-desc {
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #666;
+}
+
+.kanban-deadline {
+  font-size: 11px;
+}
+
+.kanban-blocked-by {
+  font-size: 11px;
+  color: #f44336;
+}
+
+.kanban-empty {
+  text-align: center;
+  color: #bbb;
+  font-size: 12px;
+  padding: 20px 0;
 }
 </style>

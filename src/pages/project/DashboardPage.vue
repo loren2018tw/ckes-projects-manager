@@ -156,16 +156,17 @@ const resourceStats = ref([])
 const tasks = computed(() => taskStore.tasks)
 
 const completedCount = computed(
-  () => tasks.value.filter(t => t.completedDate).length
+  () => tasks.value.filter(t => t.status === 'completed').length
 )
 
 const pendingCount = computed(
-  () => tasks.value.filter(t => !t.completedDate).length
+  () => tasks.value.filter(t => t.status !== 'completed').length
 )
 
 const overdueCount = computed(
   () =>
-    tasks.value.filter(t => !t.completedDate && isOverdue(t.deadline)).length
+    tasks.value.filter(t => t.status !== 'completed' && isOverdue(t.deadline))
+      .length
 )
 
 const remainingAmount = computed(() => {
@@ -192,7 +193,7 @@ const disbursedAmount = computed(() => {
 
 const dueSoonTasks = computed(() =>
   tasks.value
-    .filter(t => !t.completedDate && t.deadline)
+    .filter(t => t.status !== 'completed' && t.deadline)
     .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
     .slice(0, 10)
 )

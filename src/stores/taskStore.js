@@ -3,6 +3,57 @@ import { ref } from 'vue'
 
 const TASK_DATA_TYPE = 'tasks'
 
+function migrateLegacyTask(task) {
+  const t = { ...task }
+  if (!('status' in t)) {
+    t.status = t.completedDate ? 'completed' : 'not_started'
+  }
+  if (!('startDate' in t)) {
+    t.startDate = t.deadline
+      ? new Date(new Date(t.deadline).getTime() - 7 * 864e5)
+          .toISOString()
+          .slice(0, 10)
+      : null
+  }
+  if (!('description' in t)) {
+    t.description = ''
+  }
+  if (!('assignee' in t)) {
+    t.assignee = null
+  }
+  return t
+}
+
+function validateTask(tasksList, task) {
+  if (task.status === 'completed' && task.predecessorId) {
+    const pred = tasksList.find(t => t.id === task.predecessorId)
+    if (pred && pred.status !== 'completed') {
+      return {
+        valid: false,
+        message: '前置任務尚未完成，無法將此任務設為已完成'
+      }
+    }
+  }
+  if (task.startDate && task.deadline && task.startDate > task.deadline) {
+    return { valid: false, message: '開始日期不能晚於截止日期', adjust: true }
+  }
+  return { valid: true }
+}
+
+function isBlocked(tasksList, task) {
+  if (!task.predecessorId) return false
+  const pred = tasksList.find(t => t.id === task.predecessorId)
+  return !pred || pred.status !== 'completed'
+}
+
+function getTasksByStatus(tasksList, status) {
+  return tasksList.filter(t => t.status === status)
+}
+
+function getBlockedTasks(tasksList) {
+  return tasksList.filter(t => isBlocked(tasksList, t))
+}
+
 export const useTaskStore = defineStore('task', () => {
   const tasks = ref([])
   const loading = ref(false)
@@ -28,7 +79,7 @@ export const useTaskStore = defineStore('task', () => {
     try {
       const data = await readProjectData(projectId, projectName, TASK_DATA_TYPE)
       if (Array.isArray(data)) {
-        tasks.value = data
+        tasks.value = data.map(migrateLegacyTask)
       } else {
         tasks.value = []
       }
@@ -71,7 +122,13 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   async function add(projectId, task) {
-    tasks.value.push(task)
+    tasks.value.push({
+      startDate: null,
+      status: 'not_started',
+      description: '',
+      assignee: null,
+      ...task
+    })
     await save(projectId)
   }
 
@@ -96,6 +153,23 @@ export const useTaskStore = defineStore('task', () => {
     return tasks.value.filter(t => t.predecessorId === taskId)
   }
 
+  function getDependencyChain(taskId) {
+    const chain = []
+    const visited = new Set()
+    function traverse(id) {
+      if (visited.has(id)) return
+      visited.add(id)
+      const task = tasks.value.find(t => t.id === id)
+      if (!task) return
+      chain.push(task)
+      if (task.predecessorId) {
+        traverse(task.predecessorId)
+      }
+    }
+    traverse(taskId)
+    return chain
+  }
+
   return {
     tasks,
     loading,
@@ -107,7 +181,13 @@ export const useTaskStore = defineStore('task', () => {
     remove,
     find,
     getDependents,
+    getDependencyChain,
     hasCycle,
-    generateId
+    generateId,
+    migrateLegacyTask,
+    validateTask,
+    isBlocked,
+    getTasksByStatus,
+    getBlockedTasks
   }
 })
