@@ -121,5 +121,6 @@ export {
   clearAllData,
   clearSyncQueue,
   getCachedData,
-  setCachedData
+  setCachedData,
+  removeCachedData
 }

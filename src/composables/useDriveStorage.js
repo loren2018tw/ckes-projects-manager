@@ -4,6 +4,7 @@ import {
   getCached,
   setCached,
   setCachedData,
+  removeCachedData,
   clearAllCache,
   forceRefresh,
   getSyncStatus,
@@ -263,7 +264,46 @@ export function useDriveStorage() {
     }
   }
 
+  async function backgroundRefreshProjectData(
+    projectId,
+    projectName,
+    dataType,
+    cacheType
+  ) {
+    try {
+      const tok = await getToken()
+      const folderId = await ensureProjectFolder(projectId, projectName)
+      const fileId = await ensureFileInFolder(
+        `ckes_${dataType}.json`,
+        folderId,
+        `proj_file_${projectId}_${dataType}`,
+        tok
+      )
+      const data = await driveFetchJson(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+        tok
+      )
+      await setCachedData(cacheType, data, new Date().toISOString())
+    } catch (err) {
+      console.warn(`Background refresh failed for ${cacheType}:`, err.message)
+    }
+  }
+
   async function readProjectData(projectId, projectName, dataType) {
+    const cacheType = `${dataType}_${projectId}`
+    const cached = await getCached(cacheType)
+    if (cached) {
+      if (cached.expired) {
+        backgroundRefreshProjectData(
+          projectId,
+          projectName,
+          dataType,
+          cacheType
+        )
+      }
+      return cached.data
+    }
+
     const tok = await getToken()
     const fileName = `ckes_${dataType}.json`
     loadingCount.value++
@@ -276,10 +316,12 @@ export function useDriveStorage() {
         `proj_file_${projectId}_${dataType}`,
         tok
       )
-      return await driveFetchJson(
+      const data = await driveFetchJson(
         `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
         tok
       )
+      await setCachedData(cacheType, data, new Date().toISOString())
+      return data
     } catch (err) {
       driveError.value = err.message
       throw err
@@ -310,6 +352,8 @@ export function useDriveStorage() {
           body: JSON.stringify(data)
         }
       )
+      const cacheType = `${dataType}_${projectId}`
+      await setCachedData(cacheType, data, new Date().toISOString())
     } catch (err) {
       driveError.value = err.message
       throw err
@@ -392,6 +436,7 @@ export function useDriveStorage() {
     }
 
     removeCache(cacheKey)
+    await removeCachedData(`tasks_${projectId}`)
   }
 
   async function renameProjectFolder(projectId, oldName, newName) {
