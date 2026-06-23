@@ -1,5 +1,23 @@
 import { ref, computed } from 'vue'
 import { useGoogleAuth } from './useGoogleAuth.js'
+import {
+  getCached,
+  setCached,
+  setCachedData,
+  clearAllCache,
+  forceRefresh,
+  getSyncStatus,
+  getCacheStats,
+  clearAllData as clearAllCacheData,
+  configureTTL
+} from '../utils/cacheLayer.js'
+import {
+  scheduleSync,
+  startBackgroundSync,
+  processSyncQueue,
+  isSyncInProgress,
+  getOnlineStatus
+} from '../utils/syncManager.js'
 
 const APP_FOLDER_NAME = 'ckes-projects-manager'
 
@@ -163,7 +181,41 @@ export function useDriveStorage() {
     throw new Error('Not authenticated')
   }
 
+  async function fetchFromDriveDirect(dataType) {
+    const tok = await getToken()
+    const fileName = FILE_NAMES[dataType]
+    if (!fileName) throw new Error(`Unknown data type: ${dataType}`)
+
+    const fileId = await ensureFile(fileName, tok)
+    const meta = await driveFetchJson(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`,
+      tok
+    )
+    const data = await driveFetchJson(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      tok
+    )
+    return { data, modifiedTime: meta.modifiedTime }
+  }
+
+  async function backgroundRefresh(dataType) {
+    try {
+      const { data, modifiedTime } = await fetchFromDriveDirect(dataType)
+      await setCachedData(dataType, data, modifiedTime)
+    } catch (err) {
+      console.warn(`Background refresh failed for ${dataType}:`, err.message)
+    }
+  }
+
   async function readData(dataType) {
+    const cached = await getCached(dataType)
+    if (cached) {
+      if (cached.expired) {
+        backgroundRefresh(dataType)
+      }
+      return cached.data
+    }
+
     const tok = await getToken()
     const fileName = FILE_NAMES[dataType]
     if (!fileName) throw new Error(`Unknown data type: ${dataType}`)
@@ -172,10 +224,12 @@ export function useDriveStorage() {
     driveError.value = null
     try {
       const fileId = await ensureFile(fileName, tok)
-      return await driveFetchJson(
+      const data = await driveFetchJson(
         `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
         tok
       )
+      await setCachedData(dataType, data, new Date().toISOString())
+      return data
     } catch (err) {
       driveError.value = err.message
       throw err
@@ -185,29 +239,9 @@ export function useDriveStorage() {
   }
 
   async function writeData(dataType, data) {
-    const tok = await getToken()
-    const fileName = FILE_NAMES[dataType]
-    if (!fileName) throw new Error(`Unknown data type: ${dataType}`)
-
-    loadingCount.value++
-    driveError.value = null
-    try {
-      const fileId = await ensureFile(fileName, tok)
-      await driveFetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
-        tok,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        }
-      )
-    } catch (err) {
-      driveError.value = err.message
-      throw err
-    } finally {
-      loadingCount.value--
-    }
+    const clean = JSON.parse(JSON.stringify(data))
+    await setCached(dataType, clean, new Date().toISOString())
+    scheduleSync()
   }
 
   async function listFolderItems(folderId) {
@@ -606,6 +640,16 @@ export function useDriveStorage() {
     invalidateProjectFolderCache,
     invalidateAllCache,
     loading,
-    driveError
+    driveError,
+    getSyncStatus,
+    forceRefresh,
+    configureTTL,
+    getCacheStats,
+    clearAllCache,
+    processSyncQueue,
+    isSyncInProgress,
+    getOnlineStatus,
+    startBackgroundSync,
+    cleanupCache: clearAllCacheData
   }
 }

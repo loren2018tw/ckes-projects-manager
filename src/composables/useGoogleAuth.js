@@ -72,7 +72,7 @@ function requestDriveToken(silent = false) {
     })
   }
   authInProgress = !silent
-  tokenClient.requestAccessToken(silent ? { prompt: '' } : undefined)
+  tokenClient.requestAccessToken(silent ? { prompt: '' } : { prompt: 'select_account' })
 }
 
 async function silentRefreshToken() {
@@ -143,6 +143,10 @@ export function useGoogleAuth() {
         sessionStorage.removeItem(key)
       }
     }
+    try {
+      import('../utils/syncManager.js').then(m => m.cleanupSyncListeners())
+      import('../utils/cacheLayer.js').then(m => m.clearAllData())
+    } catch {}
     user.value = null
     isAuthenticated.value = false
     accessToken.value = null
