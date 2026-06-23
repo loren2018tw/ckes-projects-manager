@@ -246,8 +246,16 @@ export function useDriveStorage() {
   }
 
   async function listFolderItems(folderId) {
-    const tok = await getToken()
+    const cacheType = `folder_files_${folderId}`
+    const cached = await getCached(cacheType, 'fileList')
+    if (cached) {
+      if (cached.expired) {
+        backgroundRefreshFolderItems(folderId, cacheType)
+      }
+      return cached.data
+    }
 
+    const tok = await getToken()
     loadingCount.value++
     driveError.value = null
     try {
@@ -255,12 +263,28 @@ export function useDriveStorage() {
         `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&orderBy=name&fields=files(id,name,mimeType,size,modifiedTime,webViewLink,iconLink)`,
         tok
       )
-      return data.files || []
+      const files = data.files || []
+      await setCachedData(cacheType, files, new Date().toISOString())
+      return files
     } catch (err) {
       driveError.value = err.message
       throw err
     } finally {
       loadingCount.value--
+    }
+  }
+
+  async function backgroundRefreshFolderItems(folderId, cacheType) {
+    try {
+      const tok = await getToken()
+      const data = await driveFetchJson(
+        `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&orderBy=name&fields=files(id,name,mimeType,size,modifiedTime,webViewLink,iconLink)`,
+        tok
+      )
+      const files = data.files || []
+      await setCachedData(cacheType, files, new Date().toISOString())
+    } catch (err) {
+      console.warn(`Background refresh failed for ${cacheType}:`, err.message)
     }
   }
 
@@ -511,7 +535,9 @@ export function useDriveStorage() {
         }
       )
       if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
-      return await res.json()
+      const result = await res.json()
+      await removeCachedData(`folder_files_${folderId}`)
+      return result
     } catch (err) {
       driveError.value = err.message
       throw err
