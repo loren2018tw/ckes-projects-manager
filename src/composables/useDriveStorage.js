@@ -678,7 +678,70 @@ export function useDriveStorage() {
     }
   }
 
-  function invalidateProjectFolderCache(projectId) {
+  const REGISTRY_TYPE = 'file_registry'
+
+async function getRegistry(projectId, projectName) {
+  try {
+    return await readProjectData(projectId, projectName, REGISTRY_TYPE)
+  } catch {
+    return { files: {} }
+  }
+}
+
+async function saveRegistry(projectId, projectName, data) {
+  await writeProjectData(projectId, projectName, REGISTRY_TYPE, data)
+}
+
+async function addToRegistry(projectId, projectName, file, category) {
+  const reg = await getRegistry(projectId, projectName)
+  reg.files = reg.files || {}
+  reg.files[file.id] = {
+    id: file.id,
+    name: file.name,
+    mimeType: file.mimeType,
+    size: file.size,
+    modifiedTime: file.modifiedTime,
+    webViewLink: file.webViewLink,
+    iconLink: file.iconLink,
+    _category: category
+  }
+  await saveRegistry(projectId, projectName, reg)
+}
+
+async function removeFromRegistry(projectId, projectName, fileId) {
+  const reg = await getRegistry(projectId, projectName)
+  if (reg.files) delete reg.files[fileId]
+  await saveRegistry(projectId, projectName, reg)
+}
+
+async function listRegistryFiles(projectId, projectName) {
+  const reg = await getRegistry(projectId, projectName)
+  const regFiles = reg.files || {}
+  const regEntries = Object.values(regFiles)
+
+  const folderFiles = await listProjectFilesByCategory(projectId, projectName)
+  const foundIds = new Set(folderFiles.map(f => f.id))
+
+  const missing = regEntries.filter(e => !foundIds.has(e.id))
+  if (missing.length === 0) return folderFiles
+
+  const tok = await getToken()
+  for (const entry of missing) {
+    try {
+      const meta = await driveFetchJson(
+        `https://www.googleapis.com/drive/v3/files/${entry.id}?fields=id,name,mimeType,size,modifiedTime,webViewLink,iconLink`,
+        tok
+      )
+      meta._category = entry._category
+      folderFiles.push(meta)
+    } catch {
+      folderFiles.push(entry)
+    }
+  }
+  return folderFiles
+}
+
+function invalidateProjectFolderCache(projectId) {
     removeCache(`project_folder_${projectId}`)
   }
 
@@ -699,6 +762,7 @@ export function useDriveStorage() {
     listAppFolder,
     listFolderItems,
     ensureProjectFolder,
+    ensureProjectSubfolder,
     deleteProjectFolder,
     renameProjectFolder,
     listProjectFiles,
@@ -708,6 +772,9 @@ export function useDriveStorage() {
     uploadFileToFolder,
     downloadFile,
     deleteDriveFile,
+    addToRegistry,
+    removeFromRegistry,
+    listRegistryFiles,
     invalidateProjectFolderCache,
     invalidateAllCache,
     loading,
