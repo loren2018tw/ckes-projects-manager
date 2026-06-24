@@ -66,12 +66,7 @@
       <template v-slot:avatar>
         <q-icon name="info" />
       </template>
-      <div>
-        為保護您的隱私，本應用程式僅能存取透過本系統建立的檔案，無法讀取您自行在雲端硬碟上傳或建立的檔案。
-      </div>
-      <div>
-        ckes_tasks.json、ckes_file_registry.json 為專案資料庫，請勿編輯或刪除。
-      </div>
+      為保護您的隱私，本應用程式僅能存取透過本系統建立的檔案，無法讀取您自行在雲端硬碟上傳或建立的檔案。
     </q-banner>
 
     <q-banner v-if="error" class="bg-negative text-white q-mb-md" rounded>

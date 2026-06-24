@@ -72,7 +72,9 @@ function requestDriveToken(silent = false) {
     })
   }
   authInProgress = !silent
-  tokenClient.requestAccessToken(silent ? { prompt: '' } : { prompt: 'select_account' })
+  tokenClient.requestAccessToken(
+    silent ? { prompt: '' } : { prompt: 'select_account' }
+  )
 }
 
 async function silentRefreshToken() {

@@ -168,6 +168,13 @@ async function ensureFile(fileName, token) {
   return ensureFileInFolder(fileName, appFolderId, `file_id_${fileName}`, token)
 }
 
+async function ensureProjectRootFile(projectId, dataType, token) {
+  const fileName = `ckes_${dataType}_${projectId}.json`
+  const cacheKey = `root_file_${dataType}_${projectId}`
+  const appFolderId = await ensureAppFolder(token)
+  return ensureFileInFolder(fileName, appFolderId, cacheKey, token)
+}
+
 export function useDriveStorage() {
   const { accessToken } = useGoogleAuth()
 
@@ -180,6 +187,127 @@ export function useDriveStorage() {
     signOut()
     window.location.hash = '#/'
     throw new Error('Not authenticated')
+  }
+
+  let _migrationChecked = false
+
+  async function _ensureMigrationDone() {
+    if (_migrationChecked) return
+    _migrationChecked = true
+    try {
+      await migrateProjectDataToRoot()
+    } catch (err) {
+      console.warn('Migration check failed:', err.message)
+    }
+  }
+
+  async function migrateProjectDataToRoot() {
+    const tok = await getToken()
+    const appFolderId = await ensureAppFolder(tok)
+
+    const flagQuery = encodeURIComponent(
+      `name='ckes_migration_done.flag' and '${appFolderId}' in parents and trashed=false`
+    )
+    const flagData = await driveFetchJson(
+      `https://www.googleapis.com/drive/v3/files?q=${flagQuery}&fields=files(id)`,
+      tok
+    )
+    if (flagData.files && flagData.files.length > 0) return
+
+    const allProjectsFileId = await ensureFile('ckes_projects.json', tok)
+    const allProjectsData = await driveFetchJson(
+      `https://www.googleapis.com/drive/v3/files/${allProjectsFileId}?alt=media`,
+      tok
+    )
+    const projects = Array.isArray(allProjectsData) ? allProjectsData : []
+
+    for (const project of projects) {
+      const projectId = project.id
+      const projectName = project.name
+
+      const folderQuery = encodeURIComponent(
+        `name='${projectName}' and '${appFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+      )
+      const folderData = await driveFetchJson(
+        `https://www.googleapis.com/drive/v3/files?q=${folderQuery}&fields=files(id)`,
+        tok
+      )
+      if (!folderData.files || folderData.files.length === 0) continue
+      const projectFolderId = folderData.files[0].id
+
+      for (const dataType of ['tasks', 'file_registry']) {
+        const oldFileName = `ckes_${dataType}.json`
+        const newFileName = `ckes_${dataType}_${projectId}.json`
+
+        const destQuery = encodeURIComponent(
+          `name='${newFileName}' and '${appFolderId}' in parents and trashed=false`
+        )
+        const destData = await driveFetchJson(
+          `https://www.googleapis.com/drive/v3/files?q=${destQuery}&fields=files(id)`,
+          tok
+        )
+        if (destData.files && destData.files.length > 0) continue
+
+        const oldQuery = encodeURIComponent(
+          `name='${oldFileName}' and '${projectFolderId}' in parents and trashed=false`
+        )
+        const oldData = await driveFetchJson(
+          `https://www.googleapis.com/drive/v3/files?q=${oldQuery}&fields=files(id)`,
+          tok
+        )
+        if (!oldData.files || oldData.files.length === 0) continue
+        const oldFileId = oldData.files[0].id
+
+        const content = await driveFetchJson(
+          `https://www.googleapis.com/drive/v3/files/${oldFileId}?alt=media`,
+          tok
+        )
+
+        const meta = { name: newFileName, parents: [appFolderId] }
+        const form = new FormData()
+        form.append(
+          'metadata',
+          new Blob([JSON.stringify(meta)], { type: 'application/json' })
+        )
+        form.append(
+          'file',
+          new Blob([JSON.stringify(content)], { type: 'application/json' })
+        )
+        await fetch(
+          'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${tok}` },
+            body: form
+          }
+        )
+
+        await driveFetch(
+          `https://www.googleapis.com/drive/v3/files/${oldFileId}`,
+          tok,
+          { method: 'DELETE' }
+        )
+      }
+    }
+
+    const flagMeta = {
+      name: 'ckes_migration_done.flag',
+      parents: [appFolderId]
+    }
+    const flagForm = new FormData()
+    flagForm.append(
+      'metadata',
+      new Blob([JSON.stringify(flagMeta)], { type: 'application/json' })
+    )
+    flagForm.append('file', new Blob(['done'], { type: 'text/plain' }))
+    await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tok}` },
+        body: flagForm
+      }
+    )
   }
 
   async function fetchFromDriveDirect(dataType) {
@@ -290,19 +418,13 @@ export function useDriveStorage() {
 
   async function backgroundRefreshProjectData(
     projectId,
-    projectName,
+    _projectName,
     dataType,
     cacheType
   ) {
     try {
       const tok = await getToken()
-      const folderId = await ensureProjectFolder(projectId, projectName)
-      const fileId = await ensureFileInFolder(
-        `ckes_${dataType}.json`,
-        folderId,
-        `proj_file_${projectId}_${dataType}`,
-        tok
-      )
+      const fileId = await ensureProjectRootFile(projectId, dataType, tok)
       const data = await driveFetchJson(
         `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
         tok
@@ -313,14 +435,15 @@ export function useDriveStorage() {
     }
   }
 
-  async function readProjectData(projectId, projectName, dataType) {
+  async function readProjectData(projectId, _projectName, dataType) {
     const cacheType = `${dataType}_${projectId}`
+    await _ensureMigrationDone()
     const cached = await getCached(cacheType)
     if (cached) {
       if (cached.expired) {
         backgroundRefreshProjectData(
           projectId,
-          projectName,
+          _projectName,
           dataType,
           cacheType
         )
@@ -329,17 +452,10 @@ export function useDriveStorage() {
     }
 
     const tok = await getToken()
-    const fileName = `ckes_${dataType}.json`
     loadingCount.value++
     driveError.value = null
     try {
-      const folderId = await ensureProjectFolder(projectId, projectName)
-      const fileId = await ensureFileInFolder(
-        fileName,
-        folderId,
-        `proj_file_${projectId}_${dataType}`,
-        tok
-      )
+      const fileId = await ensureProjectRootFile(projectId, dataType, tok)
       const data = await driveFetchJson(
         `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
         tok
@@ -354,19 +470,13 @@ export function useDriveStorage() {
     }
   }
 
-  async function writeProjectData(projectId, projectName, dataType, data) {
+  async function writeProjectData(projectId, _projectName, dataType, data) {
     const tok = await getToken()
-    const fileName = `ckes_${dataType}.json`
+    await _ensureMigrationDone()
     loadingCount.value++
     driveError.value = null
     try {
-      const folderId = await ensureProjectFolder(projectId, projectName)
-      const fileId = await ensureFileInFolder(
-        fileName,
-        folderId,
-        `proj_file_${projectId}_${dataType}`,
-        tok
-      )
+      const fileId = await ensureProjectRootFile(projectId, dataType, tok)
       await driveFetch(
         `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
         tok,
@@ -454,6 +564,25 @@ export function useDriveStorage() {
             { method: 'DELETE' }
           )
         }
+      }
+
+      for (const dt of ['tasks', 'file_registry']) {
+        const rootFileName = `ckes_${dt}_${projectId}.json`
+        const rootQuery = encodeURIComponent(
+          `name='${rootFileName}' and '${appFolderId}' in parents and trashed=false`
+        )
+        const rootData = await driveFetchJson(
+          `https://www.googleapis.com/drive/v3/files?q=${rootQuery}&fields=files(id)`,
+          tok
+        )
+        if (rootData.files && rootData.files.length > 0) {
+          await driveFetch(
+            `https://www.googleapis.com/drive/v3/files/${rootData.files[0].id}`,
+            tok,
+            { method: 'DELETE' }
+          )
+        }
+        removeCache(`root_file_${dt}_${projectId}`)
       }
     } catch (err) {
       console.error('Failed to delete project folder:', err)
@@ -680,68 +809,68 @@ export function useDriveStorage() {
 
   const REGISTRY_TYPE = 'file_registry'
 
-async function getRegistry(projectId, projectName) {
-  try {
-    return await readProjectData(projectId, projectName, REGISTRY_TYPE)
-  } catch {
-    return { files: {} }
-  }
-}
-
-async function saveRegistry(projectId, projectName, data) {
-  await writeProjectData(projectId, projectName, REGISTRY_TYPE, data)
-}
-
-async function addToRegistry(projectId, projectName, file, category) {
-  const reg = await getRegistry(projectId, projectName)
-  reg.files = reg.files || {}
-  reg.files[file.id] = {
-    id: file.id,
-    name: file.name,
-    mimeType: file.mimeType,
-    size: file.size,
-    modifiedTime: file.modifiedTime,
-    webViewLink: file.webViewLink,
-    iconLink: file.iconLink,
-    _category: category
-  }
-  await saveRegistry(projectId, projectName, reg)
-}
-
-async function removeFromRegistry(projectId, projectName, fileId) {
-  const reg = await getRegistry(projectId, projectName)
-  if (reg.files) delete reg.files[fileId]
-  await saveRegistry(projectId, projectName, reg)
-}
-
-async function listRegistryFiles(projectId, projectName) {
-  const reg = await getRegistry(projectId, projectName)
-  const regFiles = reg.files || {}
-  const regEntries = Object.values(regFiles)
-
-  const folderFiles = await listProjectFilesByCategory(projectId, projectName)
-  const foundIds = new Set(folderFiles.map(f => f.id))
-
-  const missing = regEntries.filter(e => !foundIds.has(e.id))
-  if (missing.length === 0) return folderFiles
-
-  const tok = await getToken()
-  for (const entry of missing) {
+  async function getRegistry(projectId, projectName) {
     try {
-      const meta = await driveFetchJson(
-        `https://www.googleapis.com/drive/v3/files/${entry.id}?fields=id,name,mimeType,size,modifiedTime,webViewLink,iconLink`,
-        tok
-      )
-      meta._category = entry._category
-      folderFiles.push(meta)
+      return await readProjectData(projectId, projectName, REGISTRY_TYPE)
     } catch {
-      folderFiles.push(entry)
+      return { files: {} }
     }
   }
-  return folderFiles
-}
 
-function invalidateProjectFolderCache(projectId) {
+  async function saveRegistry(projectId, projectName, data) {
+    await writeProjectData(projectId, projectName, REGISTRY_TYPE, data)
+  }
+
+  async function addToRegistry(projectId, projectName, file, category) {
+    const reg = await getRegistry(projectId, projectName)
+    reg.files = reg.files || {}
+    reg.files[file.id] = {
+      id: file.id,
+      name: file.name,
+      mimeType: file.mimeType,
+      size: file.size,
+      modifiedTime: file.modifiedTime,
+      webViewLink: file.webViewLink,
+      iconLink: file.iconLink,
+      _category: category
+    }
+    await saveRegistry(projectId, projectName, reg)
+  }
+
+  async function removeFromRegistry(projectId, projectName, fileId) {
+    const reg = await getRegistry(projectId, projectName)
+    if (reg.files) delete reg.files[fileId]
+    await saveRegistry(projectId, projectName, reg)
+  }
+
+  async function listRegistryFiles(projectId, projectName) {
+    const reg = await getRegistry(projectId, projectName)
+    const regFiles = reg.files || {}
+    const regEntries = Object.values(regFiles)
+
+    const folderFiles = await listProjectFilesByCategory(projectId, projectName)
+    const foundIds = new Set(folderFiles.map(f => f.id))
+
+    const missing = regEntries.filter(e => !foundIds.has(e.id))
+    if (missing.length === 0) return folderFiles
+
+    const tok = await getToken()
+    for (const entry of missing) {
+      try {
+        const meta = await driveFetchJson(
+          `https://www.googleapis.com/drive/v3/files/${entry.id}?fields=id,name,mimeType,size,modifiedTime,webViewLink,iconLink`,
+          tok
+        )
+        meta._category = entry._category
+        folderFiles.push(meta)
+      } catch {
+        folderFiles.push(entry)
+      }
+    }
+    return folderFiles
+  }
+
+  function invalidateProjectFolderCache(projectId) {
     removeCache(`project_folder_${projectId}`)
   }
 
@@ -759,6 +888,8 @@ function invalidateProjectFolderCache(projectId) {
     writeData,
     readProjectData,
     writeProjectData,
+    ensureProjectRootFile,
+    migrateProjectDataToRoot,
     listAppFolder,
     listFolderItems,
     ensureProjectFolder,

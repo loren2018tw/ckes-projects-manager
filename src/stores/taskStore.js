@@ -59,17 +59,6 @@ export const useTaskStore = defineStore('task', () => {
   const loading = ref(false)
   const loadError = ref(null)
 
-  async function getProjectNameAsync(projectId) {
-    try {
-      const { useProjectStore } = await import('@/stores/projectStore.js')
-      const store = useProjectStore()
-      const p = store.find(projectId)
-      return p ? p.name : projectId
-    } catch {
-      return projectId
-    }
-  }
-
   async function migrateAssigneeFormat(projectId) {
     try {
       const { useProjectStaffStore } =
@@ -111,9 +100,8 @@ export const useTaskStore = defineStore('task', () => {
     loadError.value = null
     const { useDriveStorage } = await import('@/composables/useDriveStorage.js')
     const { readProjectData } = useDriveStorage()
-    const projectName = await getProjectNameAsync(projectId)
     try {
-      const data = await readProjectData(projectId, projectName, TASK_DATA_TYPE)
+      const data = await readProjectData(projectId, null, TASK_DATA_TYPE)
       if (Array.isArray(data)) {
         tasks.value = data.map(migrateLegacyTask)
         await migrateAssigneeFormat(projectId)
@@ -135,8 +123,7 @@ export const useTaskStore = defineStore('task', () => {
   async function save(projectId) {
     const { useDriveStorage } = await import('@/composables/useDriveStorage.js')
     const { writeProjectData } = useDriveStorage()
-    const projectName = await getProjectNameAsync(projectId)
-    await writeProjectData(projectId, projectName, TASK_DATA_TYPE, tasks.value)
+    await writeProjectData(projectId, null, TASK_DATA_TYPE, tasks.value)
   }
 
   function generateId() {
