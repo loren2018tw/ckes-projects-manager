@@ -30,7 +30,7 @@
     </div>
 
     <div class="row q-col-gutter-md">
-      <div class="col-12 col-md-6">
+      <div class="col-12 col-md-4">
         <q-card flat bordered>
           <q-card-section>
             <div class="text-h6">資源統計</div>
@@ -61,7 +61,7 @@
         </q-card>
       </div>
 
-      <div class="col-12 col-md-6">
+      <div class="col-12 col-md-8">
         <q-card flat bordered>
           <q-card-section>
             <div class="text-h6">任務統計</div>
@@ -103,7 +103,7 @@
                   <q-item
                     v-for="task in dueSoonTasks"
                     :key="task.id"
-                    :class="taskRowClass(task)"
+                    class="bg-orange-1"
                   >
                     <q-item-section>
                       <q-item-label>{{ task.name }}</q-item-label>
@@ -114,7 +114,25 @@
                   </q-item>
                 </q-list>
               </div>
-              <div v-else class="text-grey"> 暫無即將到期的任務 </div>
+              <div v-else class="text-grey">暫無即將到期的任務</div>
+
+              <div v-if="inProgressTasks.length > 0" class="q-mt-md">
+                <div class="text-subtitle2 q-mb-sm">進行中的任務</div>
+                <q-list dense separator>
+                  <q-item
+                    v-for="task in inProgressTasks"
+                    :key="task.id"
+                  >
+                    <q-item-section>
+                      <q-item-label>{{ task.name }}</q-item-label>
+                      <q-item-label caption>
+                        截止：{{ task.deadline ? formatDate(task.deadline) : '無截止日' }}
+                      </q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </div>
+              <div v-else-if="dueSoonTasks.length === 0" class="text-grey q-mt-md">暫無進行中的任務</div>
             </template>
           </q-card-section>
           <q-separator />
@@ -142,14 +160,14 @@
             <div v-if="projectWorkers.length === 0" class="text-grey">
               尚無工作人員
             </div>
-            <q-list v-else dense separator>
-              <q-item v-for="worker in projectWorkers" :key="worker.id">
-                <q-item-section>
-                  <q-item-label>{{ worker.name }}</q-item-label>
-                  <q-item-label caption>{{ worker.email }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
+              <q-list v-else dense separator>
+                <q-item v-for="worker in projectWorkers" :key="worker.id">
+                  <q-item-section>
+                    <q-item-label class="text-body1 text-weight-medium">{{ worker.name }}</q-item-label>
+                    <q-item-label caption class="text-body2">{{ worker.email }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
           </q-card-section>
         </q-card>
       </div>
@@ -226,10 +244,16 @@ const disbursedAmount = computed(() => {
 
 const dueSoonTasks = computed(() =>
   tasks.value
-    .filter(t => t.status !== 'completed' && t.deadline)
+    .filter(t => t.status !== 'completed' && isDueSoon(t.deadline))
     .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
-    .slice(0, 10)
 )
+
+const inProgressTasks = computed(() => {
+  const blockedIds = new Set(taskStore.getBlockedTasks(tasks.value).map(t => t.id))
+  return tasks.value
+    .filter(t => t.status !== 'completed' && !blockedIds.has(t.id) && !isOverdue(t.deadline) && !isDueSoon(t.deadline))
+    .sort((a, b) => new Date(a.deadline || 0) - new Date(b.deadline || 0))
+})
 
 function isOverdue(deadline) {
   if (!deadline) return false
@@ -242,12 +266,6 @@ function isDueSoon(deadline) {
   const due = new Date(deadline)
   const diff = (due - now) / (1000 * 60 * 60 * 24)
   return diff >= 0 && diff <= 7
-}
-
-function taskRowClass(task) {
-  if (isOverdue(task.deadline)) return 'bg-red-1'
-  if (isDueSoon(task.deadline)) return 'bg-orange-1'
-  return ''
 }
 
 function formatDate(dateStr) {
