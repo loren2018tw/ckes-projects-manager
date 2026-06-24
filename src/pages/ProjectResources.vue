@@ -21,6 +21,13 @@
         label="上傳檔案"
         @click="triggerUpload"
       />
+      <q-btn
+        color="secondary"
+        icon="cloud"
+        label="開啟專案雲端硬碟"
+        @click="openCloudDrive"
+        class="q-ml-sm"
+      />
       <input
         ref="fileInput"
         type="file"
@@ -176,6 +183,7 @@ const {
   uploadProjectFileToCategory,
   downloadFile,
   deleteDriveFile,
+  ensureProjectFolder,
   loading
 } = useDriveStorage()
 
@@ -259,6 +267,22 @@ function openFile(file) {
     ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}authuser=${encodeURIComponent(user.value.email)}`
     : baseUrl
   window.open(url, '_blank')
+}
+
+async function openCloudDrive() {
+  try {
+    const folderId = await ensureProjectFolder(
+      projectId.value,
+      projectName.value
+    )
+    const url = `https://drive.google.com/drive/folders/${folderId}`
+    const target = user.value?.email
+      ? `${url}?authuser=${encodeURIComponent(user.value.email)}`
+      : url
+    window.open(target, '_blank')
+  } catch (err) {
+    $q.notify({ type: 'negative', message: '無法開啟雲端硬碟：' + err.message })
+  }
 }
 
 function triggerUpload() {
