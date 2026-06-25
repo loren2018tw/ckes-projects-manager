@@ -807,6 +807,31 @@ export function useDriveStorage() {
     }
   }
 
+  async function copyDriveFile(fileId, newName, parentFolderId) {
+    const tok = await getToken()
+
+    loadingCount.value++
+    driveError.value = null
+    try {
+      const meta = { name: newName, parents: [parentFolderId] }
+      const result = await driveFetchJson(
+        `https://www.googleapis.com/drive/v3/files/${fileId}/copy?fields=id,name,mimeType,size,modifiedTime,iconLink`,
+        tok,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(meta)
+        }
+      )
+      return result
+    } catch (err) {
+      driveError.value = err.message
+      throw err
+    } finally {
+      loadingCount.value--
+    }
+  }
+
   const REGISTRY_TYPE = 'file_registry'
 
   async function getRegistry(projectId, projectName) {
@@ -903,6 +928,7 @@ export function useDriveStorage() {
     uploadFileToFolder,
     downloadFile,
     deleteDriveFile,
+    copyDriveFile,
     addToRegistry,
     removeFromRegistry,
     listRegistryFiles,

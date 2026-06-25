@@ -97,6 +97,15 @@
           <q-btn
             flat
             round
+            icon="content_copy"
+            color="primary"
+            @click="startClone(props.row)"
+          >
+            <q-tooltip>複製</q-tooltip>
+          </q-btn>
+          <q-btn
+            flat
+            round
             icon="delete"
             color="negative"
             @click="confirmDelete(props.row)"
@@ -122,20 +131,33 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <ProjectCloneDialog
+      v-model="cloneDialog"
+      :source-project="cloneSource"
+      :existing-project-names="existingNames"
+      :loading="projectStore.cloning"
+      :error="projectStore.cloneError"
+      @confirm="doClone"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/projectStore.js'
 import ProjectForm from '@/components/ProjectForm.vue'
+import ProjectCloneDialog from '@/components/ProjectCloneDialog.vue'
 
 const route = useRoute()
+const router = useRouter()
 const projectStore = useProjectStore()
 const deleteDialog = ref(false)
 const toDelete = ref(null)
 const editingId = ref(null)
+const cloneDialog = ref(false)
+const cloneSource = ref(null)
 
 const filterOptions = [
   { label: '進行中', value: 'active' },
@@ -164,6 +186,8 @@ const columns = [
 
 const currentProjectId = computed(() => route.params.projectId)
 
+const existingNames = computed(() => projectStore.projects.map(p => p.name))
+
 onMounted(() => projectStore.load())
 
 function startAdd() {
@@ -187,6 +211,27 @@ async function doDelete() {
   if (toDelete.value) {
     await projectStore.remove(toDelete.value.id)
     toDelete.value = null
+  }
+}
+
+function startClone(project) {
+  cloneSource.value = project
+  cloneDialog.value = true
+}
+
+async function doClone({ name, copyResources }) {
+  if (!cloneSource.value) return
+  try {
+    const newProject = await projectStore.duplicate(
+      cloneSource.value.id,
+      name,
+      copyResources
+    )
+    cloneDialog.value = false
+    cloneSource.value = null
+    router.push(`/projects/${newProject.id}`)
+  } catch {
+    // error is displayed via projectStore.cloneError
   }
 }
 </script>
