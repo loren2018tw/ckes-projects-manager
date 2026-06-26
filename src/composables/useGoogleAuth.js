@@ -61,7 +61,7 @@ function requestDriveToken(silent = false) {
   if (authInProgress) return
   if (typeof google === 'undefined') return
   if (!tokenClient) {
-    tokenClient = google.accounts.oauth2.initTokenClient({
+    const initConfig = {
       client_id: import.meta.env.QCLI_GOOGLE_CLIENT_ID,
       scope: 'openid email profile https://www.googleapis.com/auth/drive.file',
       callback: handleTokenResponse,
@@ -69,7 +69,11 @@ function requestDriveToken(silent = false) {
         authInProgress = false
         console.error('Token client error:', err)
       }
-    })
+    }
+    if (user.value?.email) {
+      initConfig.hint = user.value.email
+    }
+    tokenClient = google.accounts.oauth2.initTokenClient(initConfig)
   }
   authInProgress = !silent
   tokenClient.requestAccessToken(
@@ -85,17 +89,19 @@ async function silentRefreshToken() {
       resolve(null)
       return
     }
-    if (!tokenClient) {
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: import.meta.env.QCLI_GOOGLE_CLIENT_ID,
-        scope:
-          'openid email profile https://www.googleapis.com/auth/drive.file',
-        callback: handleTokenResponse,
-        error_callback: () => {
-          authInProgress = false
-        }
-      })
+    const silentConfig = {
+      client_id: import.meta.env.QCLI_GOOGLE_CLIENT_ID,
+      scope:
+        'openid email profile https://www.googleapis.com/auth/drive.file',
+      callback: handleTokenResponse,
+      error_callback: () => {
+        authInProgress = false
+      }
     }
+    if (user.value?.email) {
+      silentConfig.hint = user.value.email
+    }
+    tokenClient = google.accounts.oauth2.initTokenClient(silentConfig)
     if (authInProgress) {
       resolve(null)
       return

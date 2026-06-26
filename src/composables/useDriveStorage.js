@@ -49,9 +49,6 @@ async function driveFetch(url, token, options = {}, retried = false) {
         return driveFetch(url, newToken, options, true)
       }
     }
-    const { signOut } = useGoogleAuth()
-    signOut()
-    window.location.hash = '#/'
     throw new Error('登入狀態已過期或權限不足，請重新登入')
   }
   if (!res.ok) {
@@ -181,11 +178,9 @@ export function useDriveStorage() {
   async function getToken() {
     let tok = accessToken.value
     if (tok) return tok
-    const { silentRefreshToken, signOut } = useGoogleAuth()
+    const { silentRefreshToken } = useGoogleAuth()
     tok = await silentRefreshToken()
     if (tok) return tok
-    signOut()
-    window.location.hash = '#/'
     throw new Error('Not authenticated')
   }
 

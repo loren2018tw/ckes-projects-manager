@@ -62,14 +62,12 @@ export function scheduleSync() {
 }
 
 async function getAccessToken() {
-  const { accessToken, silentRefreshToken, signOut } = useGoogleAuth()
-  let tok = accessToken.value
-  if (tok) return tok
-  tok = await silentRefreshToken()
-  if (tok) return tok
-  signOut()
-  window.location.hash = '#/'
-  throw new Error('Not authenticated')
+    const { accessToken, silentRefreshToken } = useGoogleAuth()
+    let tok = accessToken.value
+    if (tok) return tok
+    tok = await silentRefreshToken()
+    if (tok) return tok
+    throw new Error('Not authenticated')
 }
 
 async function driveFetch(url, token, options = {}) {
@@ -86,9 +84,6 @@ async function driveFetch(url, token, options = {}) {
     if (newToken) {
       return driveFetch(url, newToken, options)
     }
-    const { signOut } = useGoogleAuth()
-    signOut()
-    window.location.hash = '#/'
     throw new Error('登入狀態已過期或權限不足，請重新登入')
   }
   if (!res.ok) {

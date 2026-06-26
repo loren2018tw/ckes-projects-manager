@@ -7,13 +7,12 @@ export function useGoogleDocs() {
   const error = ref(null)
 
   async function getToken() {
-    const { accessToken, silentRefreshToken, signOut } = useGoogleAuth()
+    const { accessToken, silentRefreshToken } = useGoogleAuth()
     let tok = accessToken.value
     if (!tok) {
       tok = await silentRefreshToken()
     }
     if (!tok) {
-      signOut()
       throw new Error('Not authenticated')
     }
     return tok
