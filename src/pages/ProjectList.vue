@@ -140,24 +140,49 @@
       :error="projectStore.cloneError"
       @confirm="doClone"
     />
+
+    <div v-if="!editingId" class="q-mt-lg">
+      <div class="text-h6 q-mb-md">任務統計</div>
+      <div v-for="project in targetProjects" :key="project.id" class="q-mb-md">
+        <q-card flat bordered>
+          <q-card-section>
+            <div class="text-h6">{{ project.name }}-任務統計</div>
+          </q-card-section>
+          <q-separator />
+          <q-card-section>
+            <TaskStatsCard
+              :tasks="tasksByProject[project.id] || []"
+              :loading="loadingTasks"
+            />
+          </q-card-section>
+        </q-card>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/projectStore.js'
+import { useTaskStore } from '@/stores/taskStore.js'
+import { useDriveStorage } from '@/composables/useDriveStorage.js'
 import ProjectForm from '@/components/ProjectForm.vue'
 import ProjectCloneDialog from '@/components/ProjectCloneDialog.vue'
+import TaskStatsCard from '@/components/TaskStatsCard.vue'
 
 const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
+const taskStore = useTaskStore()
+const { readProjectData } = useDriveStorage()
 const deleteDialog = ref(false)
 const toDelete = ref(null)
 const editingId = ref(null)
 const cloneDialog = ref(false)
 const cloneSource = ref(null)
+const tasksByProject = ref({})
+const loadingTasks = ref(false)
 
 const filterOptions = [
   { label: '進行中', value: 'active' },
@@ -188,7 +213,58 @@ const currentProjectId = computed(() => route.params.projectId)
 
 const existingNames = computed(() => projectStore.projects.map(p => p.name))
 
-onMounted(() => projectStore.load())
+const targetProjects = computed(() =>
+  projectStore.filter === 'all'
+    ? projectStore.projects
+    : projectStore.projects.filter(p => p.status === 'active')
+)
+
+async function loadProjectTasks() {
+  const targets = targetProjects.value
+  if (targets.length === 0) {
+    tasksByProject.value = {}
+    return
+  }
+  loadingTasks.value = true
+  try {
+    const results = await Promise.all(
+      targets.map(async project => {
+        try {
+          const data = await readProjectData(project.id, null, 'tasks')
+          return {
+            projectId: project.id,
+            tasks: Array.isArray(data)
+              ? data.map(taskStore.migrateLegacyTask)
+              : []
+          }
+        } catch {
+          return { projectId: project.id, tasks: [] }
+        }
+      })
+    )
+    const map = {}
+    for (const result of results) {
+      map[result.projectId] = result.tasks
+    }
+    tasksByProject.value = map
+  } catch {
+    tasksByProject.value = {}
+  } finally {
+    loadingTasks.value = false
+  }
+}
+
+onMounted(async () => {
+  await projectStore.load()
+  await loadProjectTasks()
+})
+
+watch(
+  () => projectStore.filter,
+  () => {
+    loadProjectTasks()
+  }
+)
 
 function startAdd() {
   editingId.value = 'new'

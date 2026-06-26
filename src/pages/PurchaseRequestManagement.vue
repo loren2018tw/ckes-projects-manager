@@ -470,6 +470,9 @@ function openAddDialog() {
   isEditingRequest.value = false
   editingRequestId.value = null
   requestForm.value = emptyRequestForm()
+  if (projectFilter.value) {
+    requestForm.value.fundProjectId = projectFilter.value
+  }
   requestDialog.value = true
 }
 

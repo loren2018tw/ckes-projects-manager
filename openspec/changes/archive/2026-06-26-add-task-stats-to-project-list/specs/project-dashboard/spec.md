@@ -1,10 +1,6 @@
-# project-dashboard Specification
+# project-dashboard Specification (Delta)
 
-## Purpose
-
-專案儀表板，為進入專案管理後的預設頁面，在同一頁面中整合顯示專案內各功能的摘要資訊。
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: 專案儀表板
 
@@ -23,21 +19,7 @@
 #### Scenario: 儀表板顯示任務摘要
 
 - **WHEN** 儀表板頁面載入
-- **THEN** 使用 `TaskStatsCard` 元件顯示任務統計資訊：已完成數、未完成數、已逾期數、即將到期任務列表
-
-### Requirement: 儀表板顯示自動彙整的工作人員
-
-專案儀表板新增「工作人員」區塊，系統自動收集該專案所有任務中被指派的負責人，去重後展示。
-
-#### Scenario: 儀表板顯示工作人員清單
-
-- **WHEN** 儀表板頁面載入
-- **THEN** 在「工作人員」區塊中顯示所有被指派為該專案任務負責人的聯絡人姓名與電子郵件，重複者只顯示一次
-
-#### Scenario: 無任務指派的專案顯示空清單
-
-- **WHEN** 專案內沒有任何任務被指派負責人
-- **THEN** 工作人員區塊顯示「尚無工作人員」提示文字
+- **THEN** 使用 `TaskStatsCard` 元件顯示任務統計資訊：總任務數、已完成數、未完成數、已逾期數、即將到期任務列表
 
 ### Requirement: 儀表板快捷操作
 
