@@ -43,7 +43,14 @@ function validateTask(tasksList, task) {
 function isBlocked(tasksList, task) {
   if (!task.predecessorId) return false
   const pred = tasksList.find(t => t.id === task.predecessorId)
-  return !pred || pred.status !== 'completed'
+  if (!pred) return true
+  if (task.dependencyType === 'SS') {
+    return !pred.startDate && pred.status === 'not_started'
+  }
+  if (task.dependencyType === 'FF') {
+    return false
+  }
+  return pred.status !== 'completed'
 }
 
 function getTasksByStatus(tasksList, status) {
@@ -145,6 +152,32 @@ export const useTaskStore = defineStore('task', () => {
     return predecessorId ? dfs(predecessorId) : false
   }
 
+  async function runSchedule(projectId, triggerTaskId) {
+    const triggerTask = tasks.value.find(t => t.id === triggerTaskId)
+    if (!triggerTask) return null
+    if (
+      triggerTask.predecessorId &&
+      hasCycle(tasks.value, triggerTask.predecessorId, triggerTaskId)
+    ) {
+      return null
+    }
+    const { useScheduleEngine } =
+      await import('@/composables/useScheduleEngine.js')
+    const { cascadeSchedule } = useScheduleEngine()
+    const result = cascadeSchedule(tasks.value, triggerTaskId)
+    if (result && result.adjustments.length > 0) {
+      for (const adj of result.adjustments) {
+        const t = tasks.value.find(t => t.id === adj.taskId)
+        if (t) {
+          if (adj.changes.startDate) t.startDate = adj.changes.startDate.to
+          if (adj.changes.deadline) t.deadline = adj.changes.deadline.to
+        }
+      }
+      return result.adjustments
+    }
+    return null
+  }
+
   async function add(projectId, task) {
     tasks.value.push({
       startDate: null,
@@ -153,15 +186,23 @@ export const useTaskStore = defineStore('task', () => {
       assignee: null,
       ...task
     })
+    const newTask = tasks.value[tasks.value.length - 1]
+    const adjustments = newTask.predecessorId
+      ? await runSchedule(projectId, newTask.id)
+      : null
     await save(projectId)
+    return adjustments
   }
 
   async function update(projectId, taskId, fields) {
     const idx = tasks.value.findIndex(t => t.id === taskId)
     if (idx !== -1) {
       tasks.value[idx] = { ...tasks.value[idx], ...fields }
+      const adjustments = await runSchedule(projectId, taskId)
       await save(projectId)
+      return adjustments
     }
+    return null
   }
 
   async function remove(projectId, taskId) {
@@ -213,6 +254,7 @@ export const useTaskStore = defineStore('task', () => {
     validateTask,
     isBlocked,
     getTasksByStatus,
-    getBlockedTasks
+    getBlockedTasks,
+    runSchedule
   }
 })

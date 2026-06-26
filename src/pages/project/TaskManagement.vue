@@ -355,7 +355,18 @@
             outlined
             dense
             type="date"
-          />
+          >
+            <template v-slot:append>
+              <q-icon
+                v-if="isStartAutoCalc"
+                name="auto_schedule"
+                color="primary"
+                size="xs"
+              >
+                <q-tooltip>自動排程計算</q-tooltip>
+              </q-icon>
+            </template>
+          </q-input>
 
           <q-select
             v-model="form.status"
@@ -373,7 +384,18 @@
             outlined
             dense
             type="date"
-          />
+          >
+            <template v-slot:append>
+              <q-icon
+                v-if="isDeadlineAutoCalc"
+                name="auto_schedule"
+                color="primary"
+                size="xs"
+              >
+                <q-tooltip>自動排程計算</q-tooltip>
+              </q-icon>
+            </template>
+          </q-input>
 
           <q-input
             v-model="form.completedDate"
@@ -461,12 +483,14 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { useQuasar } from 'quasar'
 import { useTaskStore } from '@/stores/taskStore.js'
 import { useContactStore } from '@/stores/contactStore.js'
 
 const route = useRoute()
 const taskStore = useTaskStore()
 const contactStore = useContactStore()
+const $q = useQuasar()
 
 const projectId = computed(() => route.params.projectId)
 const viewMode = ref('kanban')
@@ -549,8 +573,7 @@ function onDragOver(e) {
 async function onDrop(targetStatus) {
   if (!dragTask.value) return
   if (targetStatus === 'blocked') {
-    const { useQuasar } = await import('quasar')
-    useQuasar().notify({
+    $q.notify({
       type: 'warning',
       message: '被阻擋狀態為自動判定，無法手動設定'
     })
@@ -568,7 +591,7 @@ async function onDrop(targetStatus) {
     if (newStatus === 'completed' && !dragTask.value.completedDate) {
       fields.completedDate = new Date().toISOString().slice(0, 10)
     }
-    if (newStatus === 'not_started') {
+    if (newStatus !== 'completed') {
       fields.completedDate = null
     }
     await taskStore.update(projectId.value, dragTask.value.id, fields)
@@ -602,6 +625,7 @@ const deleteDialog = ref(false)
 const editingTask = ref(null)
 const toDelete = ref(null)
 const nameInput = ref(null)
+const scheduleResult = ref(null)
 
 const form = ref({
   name: '',
@@ -714,6 +738,18 @@ const dependentsCount = computed(() => {
   return taskStore.getDependents(toDelete.value.id).length
 })
 
+const isStartAutoCalc = computed(() => {
+  if (!form.value.predecessorId) return false
+  return (
+    form.value.dependencyType === 'FS' || form.value.dependencyType === 'SS'
+  )
+})
+
+const isDeadlineAutoCalc = computed(() => {
+  if (!form.value.predecessorId) return false
+  return form.value.dependencyType === 'FF'
+})
+
 function depLabel(type) {
   const map = { FS: '完成-開始', SS: '開始-開始', FF: '完成-完成' }
   return map[type] || type
@@ -793,8 +829,7 @@ async function saveTask() {
   if (form.value.predecessorId) {
     const newId = editingTask.value?.id || 'pending'
     if (taskStore.hasCycle(taskStore.tasks, form.value.predecessorId, newId)) {
-      const { useQuasar } = await import('quasar')
-      useQuasar().notify({
+      $q.notify({
         type: 'negative',
         message: '任務相依關係產生循環，請重新設定'
       })
@@ -803,11 +838,11 @@ async function saveTask() {
   }
 
   const autoCompletedDate =
-    form.value.status === 'completed'
+    form.value.status === 'completed' && !form.value.completedDate
       ? new Date().toISOString().slice(0, 10)
       : null
   const clearedCompletedDate =
-    form.value.status === 'not_started' ? null : undefined
+    form.value.status !== 'completed' ? null : undefined
   const finalCompletedDate =
     autoCompletedDate ||
     (clearedCompletedDate === null ? null : form.value.completedDate || null)
@@ -829,8 +864,7 @@ async function saveTask() {
     id: editingTask.value?.id || 'pending'
   })
   if (!validation.valid) {
-    const { useQuasar } = await import('quasar')
-    useQuasar().notify({
+    $q.notify({
       type: 'negative',
       message: validation.message
     })
@@ -847,12 +881,43 @@ async function saveTask() {
     return
   }
 
+  if (
+    form.value.predecessorId &&
+    form.value.dependencyType === 'FS' &&
+    !form.value.startDate
+  ) {
+    const pred = taskStore.find(form.value.predecessorId)
+    if (pred && !pred.deadline && !pred.completedDate) {
+      $q.notify({
+        type: 'warning',
+        message: '前置任務無截止日期，請手動設定相依任務的開始日期',
+        timeout: 4000
+      })
+    }
+  }
+
+  let adjustments = null
   if (editingTask.value) {
-    await taskStore.update(projectId.value, editingTask.value.id, taskData)
+    adjustments = await taskStore.update(
+      projectId.value,
+      editingTask.value.id,
+      taskData
+    )
   } else {
-    await taskStore.add(projectId.value, {
+    adjustments = await taskStore.add(projectId.value, {
       id: taskStore.generateId(),
       ...taskData
+    })
+  }
+
+  if (adjustments && adjustments.length > 0) {
+    scheduleResult.value = adjustments
+    const names = adjustments.map(a => a.taskName).join('、')
+    $q.notify({
+      type: 'info',
+      message: `自動排程已調整 ${adjustments.length} 個相依任務的日期`,
+      caption: names.length > 50 ? names.slice(0, 50) + '…' : names,
+      timeout: 5000
     })
   }
 

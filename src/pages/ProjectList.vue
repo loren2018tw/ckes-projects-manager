@@ -146,7 +146,15 @@
       <div v-for="project in targetProjects" :key="project.id" class="q-mb-md">
         <q-card flat bordered>
           <q-card-section>
-            <div class="text-h6">{{ project.name }}-任務統計</div>
+            <div class="text-h6">
+              <router-link
+                :to="`/projects/${project.id}/tasks`"
+                class="text-primary text-decoration-none"
+              >
+                {{ project.name }}-任務統計
+                <q-icon name="open_in_new" size="16px" class="q-ml-xs" />
+              </router-link>
+            </div>
           </q-card-section>
           <q-separator />
           <q-card-section>

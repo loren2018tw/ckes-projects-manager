@@ -62,12 +62,12 @@ export function scheduleSync() {
 }
 
 async function getAccessToken() {
-    const { accessToken, silentRefreshToken } = useGoogleAuth()
-    let tok = accessToken.value
-    if (tok) return tok
-    tok = await silentRefreshToken()
-    if (tok) return tok
-    throw new Error('Not authenticated')
+  const { accessToken, silentRefreshToken } = useGoogleAuth()
+  let tok = accessToken.value
+  if (tok) return tok
+  tok = await silentRefreshToken()
+  if (tok) return tok
+  throw new Error('Not authenticated')
 }
 
 async function driveFetch(url, token, options = {}) {

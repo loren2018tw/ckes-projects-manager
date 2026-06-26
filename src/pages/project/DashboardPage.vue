@@ -64,7 +64,15 @@
       <div class="col-12 col-md-8">
         <q-card flat bordered>
           <q-card-section>
-            <div class="text-h6">任務統計</div>
+            <div class="text-h6">
+              <router-link
+                :to="`/projects/${projectId}/tasks`"
+                class="text-primary text-decoration-none"
+              >
+                任務統計
+                <q-icon name="open_in_new" size="16px" class="q-ml-xs" />
+              </router-link>
+            </div>
           </q-card-section>
           <q-separator />
           <q-card-section>

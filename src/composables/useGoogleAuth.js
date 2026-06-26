@@ -91,8 +91,7 @@ async function silentRefreshToken() {
     }
     const silentConfig = {
       client_id: import.meta.env.QCLI_GOOGLE_CLIENT_ID,
-      scope:
-        'openid email profile https://www.googleapis.com/auth/drive.file',
+      scope: 'openid email profile https://www.googleapis.com/auth/drive.file',
       callback: handleTokenResponse,
       error_callback: () => {
         authInProgress = false
