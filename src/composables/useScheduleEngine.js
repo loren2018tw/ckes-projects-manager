@@ -1,6 +1,11 @@
+function isValidDate(d) {
+  return d instanceof Date && !isNaN(d)
+}
+
 function addDays(dateStr, days) {
   if (!dateStr) return null
   const d = new Date(dateStr)
+  if (!isValidDate(d)) return null
   d.setDate(d.getDate() + days)
   return d.toISOString().slice(0, 10)
 }
@@ -33,7 +38,16 @@ function scheduleTaskDate(task, predecessor, dependencyType) {
   } else if (dependencyType === 'FF') {
     const predEnd = getEffectiveEnd(predecessor)
     if (predEnd && (!task.deadline || predEnd > task.deadline)) {
-      changes.deadline = predEnd
+      const depDate = new Date(predEnd)
+      const taskDate = task.deadline ? new Date(task.deadline) : null
+      if (
+        !taskDate ||
+        (isValidDate(depDate) &&
+          isValidDate(taskDate) &&
+          predEnd > task.deadline)
+      ) {
+        changes.deadline = predEnd
+      }
     }
   }
 

@@ -101,7 +101,11 @@ const overdueCount = computed(
 const dueSoonTasks = computed(() =>
   props.tasks
     .filter(t => t.status !== 'completed' && isDueSoon(t.deadline))
-    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+    .sort((a, b) => {
+      const da = new Date(a.deadline)
+      const db = new Date(b.deadline)
+      return (isValidDate(da) ? da : 0) - (isValidDate(db) ? db : 0)
+    })
 )
 
 const inProgressTasks = computed(() => {
@@ -116,18 +120,29 @@ const inProgressTasks = computed(() => {
         !isOverdue(t.deadline) &&
         !isDueSoon(t.deadline)
     )
-    .sort((a, b) => new Date(a.deadline || 0) - new Date(b.deadline || 0))
+    .sort((a, b) => {
+      const da = a.deadline ? new Date(a.deadline) : null
+      const db = b.deadline ? new Date(b.deadline) : null
+      return (da && isValidDate(da) ? da : 0) - (db && isValidDate(db) ? db : 0)
+    })
 })
+
+function isValidDate(d) {
+  return d instanceof Date && !isNaN(d)
+}
 
 function isOverdue(deadline) {
   if (!deadline) return false
-  return new Date(deadline) < new Date(new Date().toDateString())
+  const d = new Date(deadline)
+  if (!isValidDate(d)) return false
+  return d < new Date(new Date().toDateString())
 }
 
 function isDueSoon(deadline) {
   if (!deadline) return false
-  const now = new Date()
   const due = new Date(deadline)
+  if (!isValidDate(due)) return false
+  const now = new Date()
   const diff = (due - now) / (1000 * 60 * 60 * 24)
   return diff >= 0 && diff <= 7
 }
@@ -135,6 +150,7 @@ function isDueSoon(deadline) {
 function formatDate(dateStr) {
   if (!dateStr) return '-'
   const d = new Date(dateStr)
+  if (!isValidDate(d)) return '-'
   return d.toLocaleString('zh-TW', {
     year: 'numeric',
     month: '2-digit',

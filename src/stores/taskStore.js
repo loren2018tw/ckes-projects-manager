@@ -3,17 +3,37 @@ import { ref } from 'vue'
 
 const TASK_DATA_TYPE = 'tasks'
 
+function isValidDate(d) {
+  return d instanceof Date && !isNaN(d)
+}
+
+function sanitizeDate(value) {
+  if (!value) return null
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const d = new Date(value)
+    if (!isValidDate(d)) return null
+    const iso = d.toISOString().slice(0, 10)
+    const year = parseInt(iso.slice(0, 4), 10)
+    if (year < 2000 || year > 2100) return null
+    return iso
+  }
+  const year = parseInt(value.slice(0, 4), 10)
+  if (year < 2000 || year > 2100) return null
+  return value
+}
+
 function migrateLegacyTask(task) {
   const t = { ...task }
+  t.deadline = sanitizeDate(t.deadline)
+  t.startDate = sanitizeDate(t.startDate)
+  t.completedDate = sanitizeDate(t.completedDate)
   if (!('status' in t)) {
     t.status = t.completedDate ? 'completed' : 'not_started'
   }
-  if (!('startDate' in t)) {
-    t.startDate = t.deadline
-      ? new Date(new Date(t.deadline).getTime() - 7 * 864e5)
-          .toISOString()
-          .slice(0, 10)
-      : null
+  if (!t.startDate && t.deadline) {
+    t.startDate = new Date(new Date(t.deadline).getTime() - 7 * 864e5)
+      .toISOString()
+      .slice(0, 10)
   }
   if (!('description' in t)) {
     t.description = ''
@@ -34,7 +54,13 @@ function validateTask(tasksList, task) {
       }
     }
   }
-  if (task.startDate && task.deadline && task.startDate > task.deadline) {
+  if (
+    task.startDate &&
+    task.deadline &&
+    isValidDate(new Date(task.startDate)) &&
+    isValidDate(new Date(task.deadline)) &&
+    task.startDate > task.deadline
+  ) {
     return { valid: false, message: '開始日期不能晚於截止日期', adjust: true }
   }
   return { valid: true }
@@ -128,6 +154,11 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   async function save(projectId) {
+    for (const t of tasks.value) {
+      t.deadline = sanitizeDate(t.deadline)
+      t.startDate = sanitizeDate(t.startDate)
+      t.completedDate = sanitizeDate(t.completedDate)
+    }
     const { useDriveStorage } = await import('@/composables/useDriveStorage.js')
     const { writeProjectData } = useDriveStorage()
     await writeProjectData(projectId, null, TASK_DATA_TYPE, tasks.value)

@@ -30,9 +30,9 @@
           { label: '列表', value: 'list' }
         ]"
         toggle-color="primary"
-        dense
         flat
         rounded
+        class="view-toggle"
       />
       <q-space />
     </div>
@@ -355,6 +355,7 @@
             outlined
             dense
             type="date"
+            :rules="[validDateRule]"
           >
             <template v-slot:append>
               <q-icon
@@ -384,6 +385,7 @@
             outlined
             dense
             type="date"
+            :rules="[validDateRule]"
           >
             <template v-slot:append>
               <q-icon
@@ -403,6 +405,7 @@
             outlined
             dense
             type="date"
+            :rules="[validDateRule]"
           />
 
           <q-input
@@ -690,8 +693,12 @@ const predecessorOptions = computed(() =>
 const sortedTasks = computed(() => {
   const list = [...taskStore.tasks]
   const hasDeadline = t => !!t.deadline
-  const getDeadline = t =>
-    t.deadline ? new Date(t.deadline) : new Date(9999, 11, 31)
+  const parseDeadline = t => {
+    if (!t.deadline) return null
+    const d = new Date(t.deadline)
+    return isValidDate(d) ? d : null
+  }
+  const getDeadline = t => parseDeadline(t) || new Date(9999, 11, 31)
 
   const withPred = list.filter(t => t.predecessorId)
   const withoutPred = list.filter(t => !t.predecessorId)
@@ -760,15 +767,33 @@ function getTaskName(id) {
   return t ? t.name : ''
 }
 
+function isValidDate(d) {
+  return d instanceof Date && !isNaN(d)
+}
+
+function validDateRule(value) {
+  if (!value) return true
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value))
+    return '日期格式錯誤，請使用 YYYY-MM-DD'
+  const d = new Date(value)
+  if (!isValidDate(d)) return '無效日期'
+  const year = parseInt(value.slice(0, 4), 10)
+  if (year < 2000 || year > 2100) return '日期超出有效範圍'
+  return true
+}
+
 function isOverdue(deadline) {
   if (!deadline) return false
-  return new Date(deadline) < new Date(new Date().toDateString())
+  const d = new Date(deadline)
+  if (!isValidDate(d)) return false
+  return d < new Date(new Date().toDateString())
 }
 
 function isDueSoon(deadline) {
   if (!deadline) return false
-  const now = new Date()
   const due = new Date(deadline)
+  if (!isValidDate(due)) return false
+  const now = new Date()
   const diff = (due - now) / (1000 * 60 * 60 * 24)
   return diff >= 0 && diff <= 7
 }
@@ -776,6 +801,7 @@ function isDueSoon(deadline) {
 function formatDate(dateStr) {
   if (!dateStr) return '-'
   const d = new Date(dateStr)
+  if (!isValidDate(d)) return '-'
   return d.toLocaleString('zh-TW', {
     year: 'numeric',
     month: '2-digit',
@@ -951,6 +977,7 @@ const _ganttMin = computed(() => {
     for (const d of [t.startDate, t.deadline, t.completedDate]) {
       if (!d) continue
       const dt = new Date(d)
+      if (!isValidDate(dt)) continue
       if (!min || dt < min) min = dt
     }
   }
@@ -965,6 +992,7 @@ const _ganttMax = computed(() => {
     for (const d of [t.deadline, t.completedDate, t.startDate]) {
       if (!d) continue
       const dt = new Date(d)
+      if (!isValidDate(dt)) continue
       if (!max || dt > max) max = dt
     }
   }
@@ -1047,7 +1075,8 @@ function _ganttEndX(task) {
     : task.deadline
       ? new Date(task.deadline)
       : null
-  if (!end) return _ganttLabelW + _ganttDays.value * _ganttDw.value
+  if (!end || !isValidDate(end))
+    return _ganttLabelW + _ganttDays.value * _ganttDw.value
   const off = Math.round((end - _ganttMin.value) / 864e5)
   return (
     _ganttLabelW +
@@ -1064,7 +1093,7 @@ function _ganttStartX(task) {
       : task.completedDate
         ? new Date(new Date(task.completedDate).getTime() - 7 * 864e5)
         : null
-  if (!start) return _ganttLabelW
+  if (!start || !isValidDate(start)) return _ganttLabelW
   if (task.predecessorId) {
     const pred = ganttTasks.value.find(p => p.id === task.predecessorId)
     if (pred) {
@@ -1073,7 +1102,7 @@ function _ganttStartX(task) {
         : pred.deadline
           ? new Date(pred.deadline)
           : null
-      if (pe && pe < start) start.setTime(pe.getTime())
+      if (pe && isValidDate(pe) && pe < start) start.setTime(pe.getTime())
     }
   }
   const off = Math.max(0, Math.round((start - _ganttMin.value) / 864e5))
@@ -1086,10 +1115,11 @@ function ganttBar(task) {
     : task.deadline
       ? new Date(task.deadline)
       : null
-  if (!end) return { show: false }
+  if (!end || !isValidDate(end)) return { show: false }
   const start = task.startDate
     ? new Date(task.startDate)
     : new Date(end.getTime() - 7 * 864e5)
+  if (!isValidDate(start)) return { show: false }
   if (task.predecessorId) {
     const pred = ganttTasks.value.find(p => p.id === task.predecessorId)
     if (pred) {
@@ -1098,7 +1128,7 @@ function ganttBar(task) {
         : pred.deadline
           ? new Date(pred.deadline)
           : null
-      if (pe && pe < end) start.setTime(pe.getTime())
+      if (pe && isValidDate(pe) && pe < end) start.setTime(pe.getTime())
     }
   }
   const ds = Math.max(0, Math.round((start - _ganttMin.value) / 864e5))
@@ -1106,14 +1136,15 @@ function ganttBar(task) {
     _ganttDays.value,
     Math.round((end - _ganttMin.value) / 864e5)
   )
+  const dl = task.deadline ? new Date(task.deadline) : null
   const cls =
     task.status === 'completed'
       ? 'bar-done'
-      : !task.deadline
+      : !isValidDate(dl)
         ? 'bar-planned'
-        : new Date(task.deadline) < _today
+        : dl < _today
           ? 'bar-overdue'
-          : (new Date(task.deadline) - _today) / 864e5 <= 7
+          : (dl - _today) / 864e5 <= 7
             ? 'bar-warn'
             : 'bar-ok'
   return {
@@ -1129,6 +1160,11 @@ function ganttBar(task) {
 </script>
 
 <style scoped>
+.view-toggle :deep(.q-btn) {
+  font-size: 16px;
+  padding: 6px 16px;
+}
+
 .gantt-wrap {
   border: 1px solid #ddd;
   border-radius: 4px;

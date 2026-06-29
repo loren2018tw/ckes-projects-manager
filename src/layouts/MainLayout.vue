@@ -74,6 +74,22 @@
             @click="signIn"
           />
         </template>
+
+        <q-select
+          v-model="themeName"
+          :options="themes"
+          dense
+          borderless
+          emit-value
+          map-options
+          options-dense
+          class="q-mr-sm"
+          style="min-width: 110px"
+        >
+          <template #append>
+            <q-icon name="palette" size="xs" />
+          </template>
+        </q-select>
       </q-toolbar>
     </q-header>
 
@@ -166,6 +182,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useTheme } from '@/composables/useTheme.js'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useGoogleAuth } from '@/composables/useGoogleAuth.js'
@@ -188,6 +205,7 @@ const projectStore = useProjectStore()
 const $q = useQuasar()
 const { user, isAuthenticated, signIn, signOut } = useGoogleAuth()
 const { loading } = useDriveStorage()
+const { themes, currentTheme, setTheme } = useTheme()
 
 const leftDrawerOpen = ref(false)
 const syncing = ref(false)
@@ -199,6 +217,11 @@ const projectName = computed(() => {
   if (!projectId.value) return ''
   const p = projectStore.find(projectId.value)
   return p ? p.name : ''
+})
+
+const themeName = computed({
+  get: () => currentTheme.value,
+  set: val => setTheme(val)
 })
 
 function toggleLeftDrawer() {

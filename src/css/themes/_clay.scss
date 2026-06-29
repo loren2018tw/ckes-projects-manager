@@ -1,0 +1,100 @@
+.theme-clay {
+  --q-primary: #0a0a0a;
+  --q-secondary: #1a3a3a;
+  --q-accent: #ff4d8b;
+  --q-dark: #0a1a1a;
+  --q-dark-page: #1a2a2a;
+  --q-positive: #22c55e;
+  --q-negative: #ef4444;
+  --q-info: #b8a4ed;
+  --q-warning: #f59e0b;
+
+  --clay-canvas: #fffaf0;
+  --clay-surface-soft: #faf5e8;
+  --clay-surface-card: #f5f0e0;
+  --clay-surface-strong: #ebe6d6;
+  --clay-ink: #0a0a0a;
+  --clay-body-strong: #1a1a1a;
+  --clay-body: #3a3a3a;
+  --clay-muted: #6a6a6a;
+  --clay-muted-soft: #9a9a9a;
+  --clay-on-primary: #ffffff;
+  --clay-hairline: #e5e5e5;
+  --clay-brand-pink: #ff4d8b;
+  --clay-brand-teal: #1a3a3a;
+  --clay-brand-lavender: #b8a4ed;
+  --clay-brand-peach: #ffb084;
+  --clay-brand-ochre: #e8b94a;
+  --clay-brand-mint: #a4d4c5;
+  --clay-brand-coral: #ff6b5a;
+}
+
+.theme-clay .q-header {
+  background: var(--clay-canvas) !important;
+  color: var(--clay-ink) !important;
+  border-bottom: 1px solid var(--clay-hairline);
+}
+
+.theme-clay .q-header .q-btn.q-btn--flat {
+  color: var(--clay-ink) !important;
+}
+
+.theme-clay .q-drawer {
+  background: var(--clay-canvas) !important;
+  color: var(--clay-ink) !important;
+  border-right: 1px solid var(--clay-hairline) !important;
+}
+
+.theme-clay .q-page-container {
+  background: var(--clay-canvas);
+}
+
+.theme-clay .q-item.q-router-link--active {
+  color: var(--clay-ink) !important;
+  background: var(--clay-surface-card) !important;
+}
+
+.theme-clay .q-item:hover {
+  background: var(--clay-surface-soft) !important;
+}
+
+.theme-clay .q-item-label,
+.theme-clay .q-item__label {
+  color: var(--clay-body) !important;
+}
+
+.theme-clay .q-item.q-router-link--active .q-item__label {
+  color: var(--clay-ink) !important;
+  font-weight: 600;
+}
+
+.theme-clay .q-card {
+  background: var(--clay-surface-card) !important;
+  border: 1px solid var(--clay-hairline);
+}
+
+.theme-clay .q-table {
+  background: var(--clay-canvas) !important;
+}
+
+.theme-clay .q-table thead th {
+  background: var(--clay-surface-soft) !important;
+  color: var(--clay-body-strong) !important;
+}
+
+.theme-clay .q-field--outlined .q-field__control {
+  background: var(--clay-canvas) !important;
+}
+
+.theme-clay .q-field__native,
+.theme-clay .q-field__input {
+  color: var(--clay-ink) !important;
+}
+
+.theme-clay .text-primary {
+  color: var(--q-primary) !important;
+}
+
+.theme-clay .bg-primary {
+  background: var(--q-primary) !important;
+}
