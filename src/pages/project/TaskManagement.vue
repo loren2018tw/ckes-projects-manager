@@ -165,7 +165,36 @@
         </template>
       </q-table>
 
-      <div class="text-h6 q-mt-lg q-mb-sm">甘特圖</div>
+      <div class="row items-center q-mt-lg q-mb-sm">
+        <div class="text-h6">甘特圖</div>
+        <q-space />
+        <div class="gantt-zoom-controls">
+          <q-btn
+            dense
+            flat
+            round
+            icon="remove"
+            :disable="!canZoomOut"
+            @click="zoomOut"
+          >
+            <q-tooltip>縮小</q-tooltip>
+          </q-btn>
+          <q-btn dense flat class="gantt-zoom-label" @click="resetZoom">
+            {{ ganttZoomPercent }}%
+            <q-tooltip>重設縮放</q-tooltip>
+          </q-btn>
+          <q-btn
+            dense
+            flat
+            round
+            icon="add"
+            :disable="!canZoomIn"
+            @click="zoomIn"
+          >
+            <q-tooltip>放大</q-tooltip>
+          </q-btn>
+        </div>
+      </div>
       <div class="gantt-wrap">
         <div class="gantt-header">
           <div class="gantt-name-header">任務</div>
@@ -629,6 +658,7 @@ const editingTask = ref(null)
 const toDelete = ref(null)
 const nameInput = ref(null)
 const scheduleResult = ref(null)
+const ganttZoom = ref(1)
 
 const form = ref({
   name: '',
@@ -1007,9 +1037,31 @@ const _ganttDays = computed(() => {
   return Math.max(1, Math.ceil((_ganttMax.value - _ganttMin.value) / 864e5))
 })
 
-const _ganttDw = computed(() => {
+const _ganttBaseDw = computed(() => {
   return Math.max(28, Math.min(60, 800 / _ganttDays.value))
 })
+
+const _ganttDw = computed(() => {
+  return Math.max(18, Math.min(140, _ganttBaseDw.value * ganttZoom.value))
+})
+
+const canZoomIn = computed(() => ganttZoom.value < 2.5)
+const canZoomOut = computed(() => ganttZoom.value > 0.6)
+const ganttZoomPercent = computed(() => Math.round(ganttZoom.value * 100))
+
+function zoomIn() {
+  if (!canZoomIn.value) return
+  ganttZoom.value = Math.min(2.5, +(ganttZoom.value + 0.2).toFixed(2))
+}
+
+function zoomOut() {
+  if (!canZoomOut.value) return
+  ganttZoom.value = Math.max(0.6, +(ganttZoom.value - 0.2).toFixed(2))
+}
+
+function resetZoom() {
+  ganttZoom.value = 1
+}
 
 const _ganttLabelW = 200
 
@@ -1280,6 +1332,22 @@ function ganttBar(task) {
   left: 210px;
   color: #999;
   font-size: 13px;
+}
+
+.gantt-zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  padding: 2px 4px;
+  background: #fff;
+}
+
+.gantt-zoom-label {
+  min-width: 62px;
+  font-weight: 600;
+  font-size: 12px;
 }
 
 .kanban-board {
