@@ -45,6 +45,8 @@
         flat
         bordered
         :loading="taskStore.loading"
+        :pagination="{ rowsPerPage: 0 }"
+        :rows-per-page-options="[0]"
         :hide-pagination="true"
       >
         <template v-slot:body-cell-status="props">
@@ -137,6 +139,23 @@
                 {{ depLabel(props.row.dependencyType) }}
               </q-chip>
             </template>
+            <span v-else class="text-grey">-</span>
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-external-link="props">
+          <q-td :props="props">
+            <q-btn
+              v-if="hasExternalLink(taskExternalLink(props.row))"
+              flat
+              round
+              dense
+              icon="link"
+              color="primary"
+              @click.stop="openExternalLink(taskExternalLink(props.row))"
+            >
+              <q-tooltip>開啟外部連結</q-tooltip>
+            </q-btn>
             <span v-else class="text-grey">-</span>
           </q-td>
         </template>
@@ -322,13 +341,27 @@
                   />
                   {{ task.name }}
                 </span>
-                <span
-                  v-if="task.assignee && getContactName(task.assignee)"
-                  class="kanban-avatar"
-                  :title="getContactName(task.assignee)"
-                >
-                  {{ getContactName(task.assignee).charAt(0) }}
-                </span>
+                <div class="kanban-card-actions">
+                  <q-btn
+                    v-if="hasExternalLink(taskExternalLink(task))"
+                    flat
+                    round
+                    dense
+                    icon="link"
+                    color="primary"
+                    size="sm"
+                    @click.stop="openExternalLink(taskExternalLink(task))"
+                  >
+                    <q-tooltip>開啟外部連結</q-tooltip>
+                  </q-btn>
+                  <span
+                    v-if="task.assignee && getContactName(task.assignee)"
+                    class="kanban-avatar"
+                    :title="getContactName(task.assignee)"
+                  >
+                    {{ getContactName(task.assignee).charAt(0) }}
+                  </span>
+                </div>
               </div>
               <div v-if="task.description" class="kanban-card-desc">
                 {{ task.description }}
@@ -444,6 +477,14 @@
             dense
             type="textarea"
             autogrow
+          />
+
+          <q-input
+            v-model="form.externalLink"
+            label="外部連結"
+            outlined
+            dense
+            placeholder="https://example.com"
           />
 
           <q-select
@@ -667,6 +708,7 @@ const form = ref({
   deadline: '',
   completedDate: '',
   description: '',
+  externalLink: '',
   assignee: null,
   predecessorId: null,
   dependencyType: null
@@ -708,6 +750,12 @@ const columns = [
     align: 'left'
   },
   { name: 'dependency', label: '相依任務', field: 'dependency', align: 'left' },
+  {
+    name: 'external-link',
+    label: '外部連結',
+    field: 'externalLink',
+    align: 'center'
+  },
   { name: 'actions', label: '操作', field: 'actions', align: 'center' }
 ]
 
@@ -847,6 +895,7 @@ function resetForm() {
     deadline: '',
     completedDate: '',
     description: '',
+    externalLink: '',
     assignee: null,
     predecessorId: null,
     dependencyType: null
@@ -869,11 +918,48 @@ function openEditDialog(task) {
     deadline: task.deadline || '',
     completedDate: task.completedDate || '',
     description: task.description || '',
+    externalLink: taskExternalLink(task) || '',
     assignee: task.assignee || null,
     predecessorId: task.predecessorId || null,
     dependencyType: task.dependencyType || null
   }
   dialog.value = true
+}
+
+function taskExternalLink(task) {
+  if (!task || typeof task !== 'object') return ''
+  const raw = task.externalLink || task.externalUrl || task.url || task.link || ''
+  return typeof raw === 'string' ? raw.trim() : ''
+}
+
+function hasExternalLink(link) {
+  return typeof link === 'string' && link.trim() !== ''
+}
+
+function normalizeExternalLink(link) {
+  const value = (link || '').trim()
+  if (!value) return null
+  const withProtocol = /^https?:\/\//i.test(value)
+    ? value
+    : `https://${value}`
+  try {
+    const parsed = new URL(withProtocol)
+    return parsed.href
+  } catch {
+    return null
+  }
+}
+
+function openExternalLink(link) {
+  const url = normalizeExternalLink(link)
+  if (!url) {
+    $q.notify({
+      type: 'warning',
+      message: '外部連結格式無效'
+    })
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 async function saveTask() {
@@ -910,6 +996,7 @@ async function saveTask() {
     deadline: form.value.deadline || null,
     completedDate: finalCompletedDate,
     description: form.value.description || '',
+    externalLink: (form.value.externalLink || '').trim(),
     assignee: form.value.assignee || null,
     predecessorId: form.value.predecessorId,
     dependencyType: form.value.predecessorId ? form.value.dependencyType : null
@@ -1429,6 +1516,12 @@ function ganttBar(task) {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.kanban-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .kanban-card-name {

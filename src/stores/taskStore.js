@@ -22,6 +22,11 @@ function sanitizeDate(value) {
   return value
 }
 
+function sanitizeExternalLink(task) {
+  const raw = task.externalLink || task.externalUrl || task.url || task.link || ''
+  return typeof raw === 'string' ? raw.trim() : ''
+}
+
 function migrateLegacyTask(task) {
   const t = { ...task }
   t.deadline = sanitizeDate(t.deadline)
@@ -41,6 +46,7 @@ function migrateLegacyTask(task) {
   if (!('assignee' in t)) {
     t.assignee = null
   }
+  t.externalLink = sanitizeExternalLink(t)
   return t
 }
 
@@ -158,6 +164,7 @@ export const useTaskStore = defineStore('task', () => {
       t.deadline = sanitizeDate(t.deadline)
       t.startDate = sanitizeDate(t.startDate)
       t.completedDate = sanitizeDate(t.completedDate)
+      t.externalLink = sanitizeExternalLink(t)
     }
     const { useDriveStorage } = await import('@/composables/useDriveStorage.js')
     const { writeProjectData } = useDriveStorage()
@@ -214,6 +221,7 @@ export const useTaskStore = defineStore('task', () => {
       startDate: null,
       status: 'not_started',
       description: '',
+      externalLink: '',
       assignee: null,
       ...task
     })
