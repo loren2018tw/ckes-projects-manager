@@ -173,7 +173,7 @@ function isDueSoon(deadline) {
   if (!deadline) return false;
   const due = new Date(deadline);
   if (!isValidDate(due)) return false;
-  const now = new Date();
+  const now = new Date(new Date().toDateString());
   const diff = (due - now) / (1000 * 60 * 60 * 24);
   return diff >= 0 && diff <= 7;
 }
