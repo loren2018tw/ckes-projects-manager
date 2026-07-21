@@ -522,6 +522,14 @@
         </q-card-section>
 
         <q-card-actions align="right">
+          <q-btn
+            flat
+            label="刪除"
+            color="negative"
+            :disable="!editingTask"
+            @click="confirmDelete(editingTask); dialog = false"
+          />
+          <q-space />
           <q-btn flat label="取消" v-close-popup @click="dialog = false" />
           <q-btn color="primary" label="儲存" @click="saveTask" />
         </q-card-actions>
