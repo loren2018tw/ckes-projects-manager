@@ -527,7 +527,7 @@
             label="刪除"
             color="negative"
             :disable="!editingTask"
-            @click="confirmDelete(editingTask); dialog = false"
+            @click="confirmDelete(editingTask)"
           />
           <q-space />
           <q-btn flat label="取消" v-close-popup @click="dialog = false" />
@@ -936,7 +936,8 @@ function openEditDialog(task) {
 
 function taskExternalLink(task) {
   if (!task || typeof task !== 'object') return ''
-  const raw = task.externalLink || task.externalUrl || task.url || task.link || ''
+  const raw =
+    task.externalLink || task.externalUrl || task.url || task.link || ''
   return typeof raw === 'string' ? raw.trim() : ''
 }
 
@@ -947,9 +948,7 @@ function hasExternalLink(link) {
 function normalizeExternalLink(link) {
   const value = (link || '').trim()
   if (!value) return null
-  const withProtocol = /^https?:\/\//i.test(value)
-    ? value
-    : `https://${value}`
+  const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`
   try {
     const parsed = new URL(withProtocol)
     return parsed.href
@@ -1078,6 +1077,7 @@ async function saveTask() {
 function confirmDelete(task) {
   toDelete.value = task
   deleteDialog.value = true
+  dialog.value = false
 }
 
 async function doDelete() {

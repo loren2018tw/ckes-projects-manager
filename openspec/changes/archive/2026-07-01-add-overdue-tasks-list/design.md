@@ -1,6 +1,7 @@
 ## Context
 
 `TaskStatsCard.vue` 目前有三個統計區塊：
+
 1. **統計 q-chip**：已完成、未完成、已逾期 數量
 2. **即將到期列表**：7 天內到期的任務（橘色背景）
 3. **進行中列表**：非完成、非逾期、非阻擋、非即將到期的任務
@@ -10,9 +11,11 @@
 ## Goals / Non-Goals
 
 **Goals:**
+
 - 在 `TaskStatsCard` 中新增「已逾期任務」列表區塊
 
 **Non-Goals:**
+
 - 不修改統計 q-chip 的邏輯或樣式
 - 不修改 `dueSoonTasks` 或 `inProgressTasks` 的邏輯
 - 不影響其他頁面或元件

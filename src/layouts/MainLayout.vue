@@ -166,6 +166,13 @@
             </q-item-section>
             <q-item-section>請購單管理</q-item-section>
           </q-item>
+
+          <q-item v-if="isAuthenticated" clickable to="/settings">
+            <q-item-section avatar>
+              <q-icon name="settings" />
+            </q-item-section>
+            <q-item-section>偏好設定</q-item-section>
+          </q-item>
         </template>
       </q-list>
     </q-drawer>

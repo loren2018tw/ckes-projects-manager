@@ -11,6 +11,10 @@ const routes = [
         component: () => import('@/pages/PurchaseRequestManagement.vue')
       },
       {
+        path: 'settings',
+        component: () => import('@/pages/SettingsPage.vue')
+      },
+      {
         path: 'projects/:projectId',
         component: () => import('@/pages/project/DashboardPage.vue')
       },

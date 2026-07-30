@@ -33,6 +33,7 @@
 | `{purpose}`           | `request.description`                                |
 | `{special_fund_name}` | 有關聯專案時為 `【專款：{fundProject}】`，否則為空白 |
 | `{manufacturer}`      | `request.vendor`                                     |
+| `{school_title}`      | 偏好設定中的 `schoolTitle`，預設為「臺中市東區成功國民小學」 |
 | `{yy}`                | `request.date` 民國年                                |
 | `{mm}`                | `request.date` 月份                                  |
 | `{dd}`                | `request.date` 日期                                  |
@@ -57,6 +58,16 @@
 
 - **WHEN** 請購單未關聯任何專案（`fundProject` 為 `null`）
 - **THEN** `{special_fund_name}` 填入空字串
+
+#### Scenario: 範本包含 school_title 佔位符
+
+- **WHEN** 請購單範本中包含 `{school_title}` 佔位符
+- **THEN** 系統將 `{school_title}` 替換為偏好設定中的學校抬頭
+
+#### Scenario: 套印時讀取最新設定值
+
+- **WHEN** 使用者剛修改學校抬頭並儲存，隨即列印請購單
+- **THEN** `{school_title}` 使用最新的設定值
 
 ### Requirement: 請購項目列表套印
 

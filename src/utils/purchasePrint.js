@@ -68,6 +68,7 @@ function normalizeContentXml(xmlText) {
     'purpose',
     'special_fund_name',
     'manufacturer',
+    'school_title',
     'yy',
     'mm',
     'dd',
@@ -110,7 +111,7 @@ function prepareItems(request) {
   return items
 }
 
-export async function generateOdtBlob(request) {
+export async function generateOdtBlob(request, schoolTitle) {
   const resp = await fetch('/voucher_template.odt')
   if (!resp.ok) throw new Error('無法讀取範本檔')
   const buffer = await resp.arrayBuffer()
@@ -131,7 +132,8 @@ export async function generateOdtBlob(request) {
     yy,
     mm,
     dd,
-    note: request.remark || ''
+    note: request.remark || '',
+    school_title: schoolTitle || ''
   }
 
   const amount = calcAmount(request.items)
@@ -196,8 +198,8 @@ export async function generateOdtBlob(request) {
   return outBlob
 }
 
-export async function downloadOdt(request) {
-  const blob = await generateOdtBlob(request)
+export async function downloadOdt(request, schoolTitle) {
+  const blob = await generateOdtBlob(request, schoolTitle)
   const fileName = `請購單_${request.date || '無日期'}_${(request.description || '未設定').slice(0, 20)}.odt`
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

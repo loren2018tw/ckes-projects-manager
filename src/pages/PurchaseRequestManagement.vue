@@ -322,10 +322,12 @@ import { useRoute } from 'vue-router'
 import { usePurchaseRequestStore } from '@/stores/purchaseRequestStore.js'
 import { useProjectStore } from '@/stores/projectStore.js'
 import { downloadOdt } from '@/utils/purchasePrint.js'
+import { useSettingsStore } from '@/stores/settingsStore.js'
 
 const route = useRoute()
 const store = usePurchaseRequestStore()
 const projectStore = useProjectStore()
+const settingsStore = useSettingsStore()
 
 const projectFilter = ref(null)
 
@@ -550,7 +552,8 @@ async function doDuplicate() {
 async function doPrint() {
   if (!selectedRequest.value) return
   try {
-    await downloadOdt(selectedRequest.value)
+    await settingsStore.load()
+    await downloadOdt(selectedRequest.value, settingsStore.settings.schoolTitle)
   } catch (err) {
     console.error('列印失敗', err)
   }

@@ -23,7 +23,8 @@ function sanitizeDate(value) {
 }
 
 function sanitizeExternalLink(task) {
-  const raw = task.externalLink || task.externalUrl || task.url || task.link || ''
+  const raw =
+    task.externalLink || task.externalUrl || task.url || task.link || ''
   return typeof raw === 'string' ? raw.trim() : ''
 }
 
