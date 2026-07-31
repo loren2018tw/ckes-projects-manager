@@ -4,6 +4,10 @@ const routes = [
     component: () => import('@/layouts/MainLayout.vue'),
     children: [
       { path: '', component: () => import('@/pages/HomePage.vue') },
+      {
+        path: 'privacy-policy',
+        component: () => import('@/pages/PrivacyPolicy.vue')
+      },
       { path: 'contacts', component: () => import('@/pages/ContactList.vue') },
       { path: 'projects', component: () => import('@/pages/ProjectList.vue') },
       {

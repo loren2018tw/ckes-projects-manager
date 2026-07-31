@@ -173,6 +173,15 @@
             </q-item-section>
             <q-item-section>偏好設定</q-item-section>
           </q-item>
+
+          <q-separator />
+
+          <q-item clickable to="/privacy-policy">
+            <q-item-section avatar>
+              <q-icon name="privacy_tip" />
+            </q-item-section>
+            <q-item-section>隱私權政策</q-item-section>
+          </q-item>
         </template>
       </q-list>
     </q-drawer>
