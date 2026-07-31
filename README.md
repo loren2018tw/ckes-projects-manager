@@ -15,11 +15,13 @@
 
 ## 環境變數
 
+請到 [Google Cloud Console](https://console.cloud.google.com) 建立 OAuth 2.0 用戶端 ID（網頁應用程式類型）。
+
+複製 env.example 為 .env ，填入要用來使用 google 帳號登入的 OAuth 2.0 用戶端 ID
+
 ```env
 QCLI_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 ```
-
-請到 [Google Cloud Console](https://console.cloud.google.com) 建立 OAuth 2.0 用戶端 ID（網頁應用程式類型）。
 
 ## 開發
 
