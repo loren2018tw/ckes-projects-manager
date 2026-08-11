@@ -30,7 +30,7 @@
       <q-card flat bordered class="q-mb-lg">
         <q-card-section>
           <div class="text-h6 q-mb-sm">
-            {{ editingId === 'new' ? '新增專案' : '編輯專案' }}
+            {{ editingId === "new" ? "新增專案" : "編輯專案" }}
           </div>
           <ProjectForm
             :key="editingId"
@@ -53,7 +53,7 @@
         sortBy: null,
         descending: false,
         page: 1,
-        rowsPerPage: 10
+        rowsPerPage: 10,
       }"
     >
       <template v-slot:body-cell-name="props">
@@ -75,7 +75,7 @@
             text-color="white"
             size="sm"
           >
-            {{ props.row.status === 'active' ? '進行中' : '結案' }}
+            {{ props.row.status === "active" ? "進行中" : "結案" }}
           </q-chip>
         </q-td>
       </template>
@@ -170,150 +170,153 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useProjectStore } from '@/stores/projectStore.js'
-import { useTaskStore } from '@/stores/taskStore.js'
-import { useDriveStorage } from '@/composables/useDriveStorage.js'
-import ProjectForm from '@/components/ProjectForm.vue'
-import ProjectCloneDialog from '@/components/ProjectCloneDialog.vue'
-import TaskStatsCard from '@/components/TaskStatsCard.vue'
+import { ref, computed, onMounted, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useProjectStore } from "@/stores/projectStore.js";
+import { useTaskStore } from "@/stores/taskStore.js";
+import { useDriveStorage } from "@/composables/useDriveStorage.js";
+import ProjectForm from "@/components/ProjectForm.vue";
+import ProjectCloneDialog from "@/components/ProjectCloneDialog.vue";
+import TaskStatsCard from "@/components/TaskStatsCard.vue";
 
-const route = useRoute()
-const router = useRouter()
-const projectStore = useProjectStore()
-const taskStore = useTaskStore()
-const { readProjectData } = useDriveStorage()
-const deleteDialog = ref(false)
-const toDelete = ref(null)
-const editingId = ref(null)
-const cloneDialog = ref(false)
-const cloneSource = ref(null)
-const tasksByProject = ref({})
-const loadingTasks = ref(false)
+const route = useRoute();
+const router = useRouter();
+const projectStore = useProjectStore();
+const taskStore = useTaskStore();
+const { readProjectData } = useDriveStorage();
+const deleteDialog = ref(false);
+const toDelete = ref(null);
+const editingId = ref(null);
+const cloneDialog = ref(false);
+const cloneSource = ref(null);
+const tasksByProject = ref({});
+const loadingTasks = ref(false);
 
 const filterOptions = [
-  { label: '進行中', value: 'active' },
-  { label: '所有專案', value: 'all' }
-]
+  { label: "進行中", value: "active" },
+  { label: "已結案", value: "closed" },
+  { label: "所有專案", value: "all" },
+];
 
 const columns = [
   {
-    name: 'name',
-    label: '專案名稱',
-    field: 'name',
-    align: 'left',
-    sortable: true
+    name: "name",
+    label: "專案名稱",
+    field: "name",
+    align: "left",
+    sortable: true,
   },
-  { name: 'status', label: '狀態', field: 'status', align: 'center' },
+  { name: "status", label: "狀態", field: "status", align: "center" },
   {
-    name: 'budget',
-    label: '核定金額',
-    field: 'budget',
-    align: 'right',
-    format: v => (v ? 'NT$ ' + Number(v).toLocaleString() : '-')
+    name: "budget",
+    label: "核定金額",
+    field: "budget",
+    align: "right",
+    format: (v) => (v ? "NT$ " + Number(v).toLocaleString() : "-"),
   },
-  { name: 'createdAt', label: '建立時間', field: 'createdAt', align: 'left' },
-  { name: 'actions', label: '操作', field: 'actions', align: 'center' }
-]
+  { name: "createdAt", label: "建立時間", field: "createdAt", align: "left" },
+  { name: "actions", label: "操作", field: "actions", align: "center" },
+];
 
-const currentProjectId = computed(() => route.params.projectId)
+const currentProjectId = computed(() => route.params.projectId);
 
-const existingNames = computed(() => projectStore.projects.map(p => p.name))
+const existingNames = computed(() => projectStore.projects.map((p) => p.name));
 
-const targetProjects = computed(() =>
-  projectStore.filter === 'all'
-    ? projectStore.projects
-    : projectStore.projects.filter(p => p.status === 'active')
-)
+const targetProjects = computed(() => {
+  if (projectStore.filter === "all") return projectStore.projects;
+  if (projectStore.filter === "closed") {
+    return projectStore.projects.filter((p) => p.status === "closed");
+  }
+  return projectStore.projects.filter((p) => p.status === "active");
+});
 
 async function loadProjectTasks() {
-  const targets = targetProjects.value
+  const targets = targetProjects.value;
   if (targets.length === 0) {
-    tasksByProject.value = {}
-    return
+    tasksByProject.value = {};
+    return;
   }
-  loadingTasks.value = true
+  loadingTasks.value = true;
   try {
     const results = await Promise.all(
-      targets.map(async project => {
+      targets.map(async (project) => {
         try {
-          const data = await readProjectData(project.id, null, 'tasks')
+          const data = await readProjectData(project.id, null, "tasks");
           return {
             projectId: project.id,
             tasks: Array.isArray(data)
               ? data.map(taskStore.migrateLegacyTask)
-              : []
-          }
+              : [],
+          };
         } catch {
-          return { projectId: project.id, tasks: [] }
+          return { projectId: project.id, tasks: [] };
         }
-      })
-    )
-    const map = {}
+      }),
+    );
+    const map = {};
     for (const result of results) {
-      map[result.projectId] = result.tasks
+      map[result.projectId] = result.tasks;
     }
-    tasksByProject.value = map
+    tasksByProject.value = map;
   } catch {
-    tasksByProject.value = {}
+    tasksByProject.value = {};
   } finally {
-    loadingTasks.value = false
+    loadingTasks.value = false;
   }
 }
 
 onMounted(async () => {
-  await projectStore.load()
-  await loadProjectTasks()
-})
+  await projectStore.load();
+  await loadProjectTasks();
+});
 
 watch(
   () => projectStore.filter,
   () => {
-    loadProjectTasks()
-  }
-)
+    loadProjectTasks();
+  },
+);
 
 function startAdd() {
-  editingId.value = 'new'
+  editingId.value = "new";
 }
 
 function startEdit(id) {
-  editingId.value = id
+  editingId.value = id;
 }
 
 function onSaved() {
-  editingId.value = null
+  editingId.value = null;
 }
 
 function confirmDelete(project) {
-  toDelete.value = project
-  deleteDialog.value = true
+  toDelete.value = project;
+  deleteDialog.value = true;
 }
 
 async function doDelete() {
   if (toDelete.value) {
-    await projectStore.remove(toDelete.value.id)
-    toDelete.value = null
+    await projectStore.remove(toDelete.value.id);
+    toDelete.value = null;
   }
 }
 
 function startClone(project) {
-  cloneSource.value = project
-  cloneDialog.value = true
+  cloneSource.value = project;
+  cloneDialog.value = true;
 }
 
 async function doClone({ name, copyResources }) {
-  if (!cloneSource.value) return
+  if (!cloneSource.value) return;
   try {
     const newProject = await projectStore.duplicate(
       cloneSource.value.id,
       name,
-      copyResources
-    )
-    cloneDialog.value = false
-    cloneSource.value = null
-    router.push(`/projects/${newProject.id}`)
+      copyResources,
+    );
+    cloneDialog.value = false;
+    cloneSource.value = null;
+    router.push(`/projects/${newProject.id}`);
   } catch {
     // error is displayed via projectStore.cloneError
   }

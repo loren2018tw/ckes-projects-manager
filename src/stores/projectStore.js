@@ -27,6 +27,9 @@ export const useProjectStore = defineStore('project', () => {
 
   const filteredProjects = computed(() => {
     if (filter.value === 'all') return projects.value
+    if (filter.value === 'closed') {
+      return projects.value.filter(p => p.status === 'closed')
+    }
     return projects.value.filter(p => p.status === 'active')
   })
 
@@ -175,7 +178,7 @@ export const useProjectStore = defineStore('project', () => {
       if (newId) {
         try {
           await deleteProjectFolder(newId, newName)
-        } catch {}
+        } catch { }
       }
       throw err
     } finally {
