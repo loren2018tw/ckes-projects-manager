@@ -17,6 +17,7 @@
   "scripts": {
     "lint": "oxfmt && oxlint --fix",
     "lint:check": "oxfmt --check && oxlint",
+    "test": "node --test src/utils/projectBudget.test.js",
     "dev": "quasar dev",
     "build": "quasar build",
     "postinstall": "quasar prepare --silent"

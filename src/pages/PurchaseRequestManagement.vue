@@ -322,6 +322,7 @@ import { useRoute } from 'vue-router'
 import { usePurchaseRequestStore } from '@/stores/purchaseRequestStore.js'
 import { useProjectStore } from '@/stores/projectStore.js'
 import { downloadOdt } from '@/utils/purchasePrint.js'
+import { requestAmount } from '@/utils/projectBudget.js'
 import { useSettingsStore } from '@/stores/settingsStore.js'
 
 const route = useRoute()
@@ -450,18 +451,7 @@ const itemSubtotal = computed(() => {
 })
 
 function formatAmount(row) {
-  if (
-    row.manualAmount !== null &&
-    row.manualAmount !== undefined &&
-    row.manualAmount !== ''
-  ) {
-    return Number(row.manualAmount).toLocaleString()
-  }
-  const items = row.items || []
-  const total = items.reduce((sum, item) => {
-    return sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
-  }, 0)
-  return total.toLocaleString()
+  return requestAmount(row).toLocaleString()
 }
 
 function onRowClick(evt, row) {

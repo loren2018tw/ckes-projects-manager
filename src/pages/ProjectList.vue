@@ -26,6 +26,27 @@
       />
     </div>
 
+    <q-banner
+      v-if="purchaseRequestStore.loadError"
+      dense
+      rounded
+      class="bg-negative text-white q-mb-md"
+    >
+      <template v-slot:avatar>
+        <q-icon name="error" />
+      </template>
+      請購單資料載入失敗，剩餘經費暫無法計算。
+      <template v-slot:action>
+        <q-btn
+          flat
+          color="white"
+          label="重試"
+          :loading="purchaseRequestsLoading"
+          @click="loadPurchaseRequests"
+        />
+      </template>
+    </q-banner>
+
     <div v-if="editingId">
       <q-card flat bordered class="q-mb-lg">
         <q-card-section>
@@ -44,7 +65,7 @@
 
     <q-table
       v-if="!editingId"
-      :rows="projectStore.filteredProjects"
+      :rows="tableRows"
       :columns="columns"
       row-key="id"
       flat
@@ -77,6 +98,20 @@
           >
             {{ props.row.status === "active" ? "進行中" : "結案" }}
           </q-chip>
+        </q-td>
+      </template>
+
+      <template v-slot:body-cell-remaining="props">
+        <q-td :props="props" :class="remainingCellClass(props.row)">
+          <template v-if="purchaseRequestsLoading">…</template>
+          <template v-else-if="purchaseRequestStore.loadError">-</template>
+          <template v-else>
+            NT$ {{ props.row._remaining.toLocaleString() }}
+            <q-tooltip>
+              核定 {{ budgetLabel(props.row) }} − 已動支 NT$
+              {{ props.row._disbursed.toLocaleString() }}
+            </q-tooltip>
+          </template>
         </q-td>
       </template>
 
@@ -174,7 +209,9 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useProjectStore } from "@/stores/projectStore.js";
 import { useTaskStore } from "@/stores/taskStore.js";
+import { usePurchaseRequestStore } from "@/stores/purchaseRequestStore.js";
 import { useDriveStorage } from "@/composables/useDriveStorage.js";
+import { projectDisbursed, projectRemaining } from "@/utils/projectBudget.js";
 import ProjectForm from "@/components/ProjectForm.vue";
 import ProjectCloneDialog from "@/components/ProjectCloneDialog.vue";
 import TaskStatsCard from "@/components/TaskStatsCard.vue";
@@ -183,6 +220,7 @@ const route = useRoute();
 const router = useRouter();
 const projectStore = useProjectStore();
 const taskStore = useTaskStore();
+const purchaseRequestStore = usePurchaseRequestStore();
 const { readProjectData } = useDriveStorage();
 const deleteDialog = ref(false);
 const toDelete = ref(null);
@@ -191,6 +229,7 @@ const cloneDialog = ref(false);
 const cloneSource = ref(null);
 const tasksByProject = ref({});
 const loadingTasks = ref(false);
+const purchaseRequestsLoading = ref(true);
 
 const filterOptions = [
   { label: "進行中", value: "active" },
@@ -212,7 +251,16 @@ const columns = [
     label: "核定金額",
     field: "budget",
     align: "right",
-    format: (v) => (v ? "NT$ " + Number(v).toLocaleString() : "-"),
+    format: (v) =>
+      v === null || v === undefined || v === ""
+        ? "-"
+        : "NT$ " + Number(v).toLocaleString(),
+  },
+  {
+    name: "remaining",
+    label: "剩餘經費",
+    field: "_remaining",
+    align: "right",
   },
   { name: "createdAt", label: "建立時間", field: "createdAt", align: "left" },
   { name: "actions", label: "操作", field: "actions", align: "center" },
@@ -222,6 +270,14 @@ const currentProjectId = computed(() => route.params.projectId);
 
 const existingNames = computed(() => projectStore.projects.map((p) => p.name));
 
+const tableRows = computed(() =>
+  projectStore.filteredProjects.map((project) => ({
+    ...project,
+    _disbursed: projectDisbursed(project.id, purchaseRequestStore.requests),
+    _remaining: projectRemaining(project, purchaseRequestStore.requests),
+  })),
+);
+
 const targetProjects = computed(() => {
   if (projectStore.filter === "all") return projectStore.projects;
   if (projectStore.filter === "closed") {
@@ -229,6 +285,26 @@ const targetProjects = computed(() => {
   }
   return projectStore.projects.filter((p) => p.status === "active");
 });
+
+function budgetLabel(row) {
+  const budget = row.budget;
+  if (budget === null || budget === undefined || budget === "") return "未填";
+  return "NT$ " + Number(budget).toLocaleString();
+}
+
+function remainingCellClass(row) {
+  if (purchaseRequestsLoading.value || purchaseRequestStore.loadError) return "";
+  return row._remaining < 0 ? "text-negative text-weight-medium" : "";
+}
+
+async function loadPurchaseRequests() {
+  purchaseRequestsLoading.value = true;
+  try {
+    await purchaseRequestStore.load();
+  } finally {
+    purchaseRequestsLoading.value = false;
+  }
+}
 
 async function loadProjectTasks() {
   const targets = targetProjects.value;
@@ -266,7 +342,7 @@ async function loadProjectTasks() {
 }
 
 onMounted(async () => {
-  await projectStore.load();
+  await Promise.all([projectStore.load(), loadPurchaseRequests()]);
   await loadProjectTasks();
 });
 

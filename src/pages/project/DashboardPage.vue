@@ -130,6 +130,7 @@ import { usePurchaseRequestStore } from '@/stores/purchaseRequestStore.js'
 import { useTaskStore } from '@/stores/taskStore.js'
 import { useContactStore } from '@/stores/contactStore.js'
 import { useDriveStorage } from '@/composables/useDriveStorage.js'
+import { projectDisbursed, projectRemaining } from '@/utils/projectBudget.js'
 import TaskStatsCard from '@/components/TaskStatsCard.vue'
 
 const route = useRoute()
@@ -154,27 +155,13 @@ const projectWorkers = computed(() => {
     .filter(Boolean)
 })
 
-const remainingAmount = computed(() => {
-  return (Number(projectData.value?.budget) || 0) - disbursedAmount.value
-})
+const remainingAmount = computed(() =>
+  projectRemaining(projectData.value, purchaseRequestStore.requests)
+)
 
-const disbursedAmount = computed(() => {
-  return purchaseRequestStore.requests
-    .filter(r => r.fundProjectId === projectId.value)
-    .reduce((sum, r) => {
-      if (
-        r.manualAmount !== null &&
-        r.manualAmount !== undefined &&
-        r.manualAmount !== ''
-      ) {
-        return sum + Number(r.manualAmount)
-      }
-      const itemsTotal = (r.items || []).reduce((s, item) => {
-        return s + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
-      }, 0)
-      return sum + itemsTotal
-    }, 0)
-})
+const disbursedAmount = computed(() =>
+  projectDisbursed(projectId.value, purchaseRequestStore.requests)
+)
 
 async function loadResourceStats() {
   const project = projectStore.find(projectId.value)
