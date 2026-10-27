@@ -319,71 +319,186 @@
               v-for="task in col.tasks"
               :key="task.id"
               class="kanban-card"
-              :class="'kanban-card-' + col.status"
+              :class="[
+                'kanban-card-' + col.status,
+                {
+                  'has-link': hasExternalLink(taskExternalLink(task)),
+                  'has-avatar': !!(
+                    task.assignee && getContactName(task.assignee)
+                  )
+                }
+              ]"
               draggable="true"
               @dragstart="onDragStart(task)"
               @dragend="onDragEnd"
               @click="openEditDialog(task)"
             >
-              <div class="kanban-card-top">
-                <span class="kanban-card-name">
-                  <q-icon
-                    v-if="col.status === 'blocked'"
-                    name="lock"
-                    size="xs"
-                    class="q-mr-xs"
-                  />
-                  <q-icon
-                    v-else-if="col.status === 'completed'"
-                    name="check_circle"
-                    size="xs"
-                    class="q-mr-xs"
-                  />
-                  {{ task.name }}
-                </span>
-                <div class="kanban-card-actions">
-                  <q-btn
-                    v-if="hasExternalLink(taskExternalLink(task))"
-                    flat
-                    round
-                    dense
-                    icon="link"
-                    color="primary"
-                    size="sm"
-                    @click.stop="openExternalLink(taskExternalLink(task))"
-                  >
-                    <q-tooltip>開啟外部連結</q-tooltip>
-                  </q-btn>
-                  <span
-                    v-if="task.assignee && getContactName(task.assignee)"
-                    class="kanban-avatar"
-                    :title="getContactName(task.assignee)"
-                  >
-                    {{ getContactName(task.assignee).charAt(0) }}
+              <div class="kanban-card-main">
+                <div class="kanban-card-top">
+                  <span class="kanban-card-name">
+                    <q-icon
+                      v-if="col.status === 'blocked'"
+                      name="lock"
+                      size="xs"
+                      class="q-mr-xs"
+                    />
+                    <q-icon
+                      v-else-if="col.status === 'completed'"
+                      name="check_circle"
+                      size="xs"
+                      class="q-mr-xs"
+                    />
+                    {{ task.name }}
                   </span>
                 </div>
-              </div>
-              <div v-if="task.description" class="kanban-card-desc">
-                {{ task.description }}
-              </div>
-              <div class="kanban-card-meta">
-                <span
-                  v-if="task.deadline"
-                  class="kanban-deadline"
-                  :class="{
-                    'text-negative':
-                      isOverdue(task.deadline) && task.status !== 'completed',
-                    'text-orange':
-                      isDueSoon(task.deadline) && task.status !== 'completed'
-                  }"
+                <div v-if="task.description" class="kanban-card-desc">
+                  {{ task.description }}
+                </div>
+                <div class="kanban-card-meta">
+                  <span
+                    v-if="task.deadline"
+                    class="kanban-deadline"
+                    :class="{
+                      'text-negative':
+                        isOverdue(task.deadline) && task.status !== 'completed',
+                      'text-orange':
+                        isDueSoon(task.deadline) && task.status !== 'completed'
+                    }"
+                  >
+                    截止: {{ formatDate(task.deadline) }}
+                  </span>
+                  <span
+                    v-if="col.status === 'blocked' && task.predecessorId"
+                    class="kanban-blocked-by"
+                  >
+                    相依: {{ predecessorName(task) }}
+                  </span>
+                </div>
+
+                <q-tooltip
+                  v-if="allowsTaskHover && !dialog && !dragTask"
+                  :delay="0"
+                  max-width="360px"
+                  max-height="80vh"
+                  anchor="bottom middle"
+                  self="top middle"
+                  :offset="TASK_HOVER_OFFSET"
+                  class="task-hover-panel"
                 >
-                  截止: {{ formatDate(task.deadline) }}
-                </span>
-                <span
-                  v-if="col.status === 'blocked' && task.predecessorId"
-                  class="kanban-blocked-by"
+                  <div class="task-hover">
+                    <div class="task-hover-header">
+                      <div class="task-hover-title">{{ task.name }}</div>
+                      <span
+                        class="task-hover-chip"
+                        :class="'task-hover-chip-' + col.status"
+                      >
+                        {{ col.label }}
+                      </span>
+                    </div>
+                    <div class="task-hover-body">
+                      <div class="task-hover-row">
+                        <span class="task-hover-label">負責人</span>
+                        <span class="task-hover-value">
+                          {{ getContactName(task.assignee) || '—' }}
+                        </span>
+                      </div>
+                      <div class="task-hover-row">
+                        <span class="task-hover-label">開始</span>
+                        <span class="task-hover-value">
+                          {{ hoverDate(task.startDate) }}
+                        </span>
+                      </div>
+                      <div class="task-hover-row">
+                        <span class="task-hover-label">截止</span>
+                        <span
+                          class="task-hover-value"
+                          :class="{
+                            'text-negative':
+                              isOverdue(task.deadline) &&
+                              task.status !== 'completed',
+                            'text-orange':
+                              isDueSoon(task.deadline) &&
+                              task.status !== 'completed'
+                          }"
+                        >
+                          {{ hoverDate(task.deadline) }}
+                        </span>
+                      </div>
+                      <div v-if="task.completedDate" class="task-hover-row">
+                        <span class="task-hover-label">完成</span>
+                        <span class="task-hover-value">
+                          {{ hoverDate(task.completedDate) }}
+                        </span>
+                      </div>
+                      <div v-if="task.predecessorId" class="task-hover-row">
+                        <span class="task-hover-label">相依</span>
+                        <span class="task-hover-value">
+                          {{ dependencyLabel(task) }}
+                        </span>
+                      </div>
+                      <div
+                        v-if="getDependentsCount(task.id) > 0"
+                        class="task-hover-row"
+                      >
+                        <span class="task-hover-label">後續相依</span>
+                        <span class="task-hover-value">
+                          {{ getDependentsCount(task.id) }} 個任務
+                        </span>
+                      </div>
+                      <template v-if="col.status === 'blocked'">
+                        <div class="task-hover-divider"></div>
+                        <div class="task-hover-row">
+                          <span class="task-hover-label">原狀態</span>
+                          <span class="task-hover-value">
+                            {{ statusLabel(task.status) }}
+                          </span>
+                        </div>
+                        <div class="task-hover-row">
+                          <span class="task-hover-label">阻擋原因</span>
+                          <span class="task-hover-value">
+                            {{ blockedReason(task) }}
+                          </span>
+                        </div>
+                      </template>
+                      <template v-if="task.description">
+                        <div class="task-hover-divider"></div>
+                        <div class="task-hover-section-label">描述</div>
+                        <div class="task-hover-desc">
+                          {{ task.description }}
+                        </div>
+                      </template>
+                      <template v-if="taskExternalLink(task)">
+                        <div class="task-hover-divider"></div>
+                        <div class="task-hover-row">
+                          <span class="task-hover-label">連結</span>
+                          <span class="task-hover-value task-hover-link">
+                            {{ taskExternalLink(task) }}
+                          </span>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </q-tooltip>
+              </div>
+              <div v-if="hasCardActions(task)" class="kanban-card-actions">
+                <q-btn
+                  v-if="hasExternalLink(taskExternalLink(task))"
+                  flat
+                  round
+                  dense
+                  icon="link"
+                  color="primary"
+                  size="sm"
+                  @click.stop="openExternalLink(taskExternalLink(task))"
                 >
-                  相依: {{ getTaskName(task.predecessorId) }}
+                  <q-tooltip>開啟外部連結</q-tooltip>
+                </q-btn>
+                <span
+                  v-if="task.assignee && getContactName(task.assignee)"
+                  class="kanban-avatar"
+                  :title="getContactName(task.assignee)"
+                >
+                  {{ getContactName(task.assignee).charAt(0) }}
                 </span>
               </div>
             </div>
@@ -577,6 +692,9 @@ const projectId = computed(() => route.params.projectId)
 const viewMode = ref('kanban')
 
 const dragTask = ref(null)
+const allowsTaskHover = computed(() => !$q.platform.is.mobile)
+// 卡片內距 10px + 邊框 1px + 與卡片間距 8px
+const TASK_HOVER_OFFSET = [0, 19]
 
 function getContactName(contactId) {
   const contact = contactStore.find(contactId)
@@ -851,6 +969,54 @@ function depLabel(type) {
 function getTaskName(id) {
   const t = taskStore.find(id)
   return t ? t.name : ''
+}
+
+function hasCardActions(task) {
+  return (
+    hasExternalLink(taskExternalLink(task)) ||
+    !!(task.assignee && getContactName(task.assignee))
+  )
+}
+
+function statusLabel(status) {
+  const map = {
+    not_started: '未開始',
+    in_progress: '進行中',
+    completed: '已完成'
+  }
+  return map[status] || status || '—'
+}
+
+function predecessorName(task) {
+  const pred = taskStore.find(task.predecessorId)
+  return pred ? pred.name : '（前置任務已刪除）'
+}
+
+function dependencyLabel(task) {
+  if (!task.predecessorId) return '—'
+  const name = predecessorName(task)
+  return task.dependencyType
+    ? `${name} · ${depLabel(task.dependencyType)}`
+    : name
+}
+
+function getDependentsCount(taskId) {
+  return taskStore.getDependents(taskId).length
+}
+
+function blockedReason(task) {
+  if (!task.predecessorId) return '—'
+  const pred = taskStore.find(task.predecessorId)
+  if (!pred) return '前置任務已刪除'
+  if (task.dependencyType === 'SS') {
+    return `前置任務「${pred.name}」尚未開始`
+  }
+  return `前置任務「${pred.name}」尚未完成`
+}
+
+function hoverDate(value) {
+  const formatted = formatDate(value)
+  return formatted === '-' ? '—' : formatted
 }
 
 function isValidDate(d) {
@@ -1485,6 +1651,7 @@ function ganttBar(task) {
 }
 
 .kanban-card {
+  position: relative;
   background: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
@@ -1493,6 +1660,10 @@ function ganttBar(task) {
   transition:
     box-shadow 0.15s,
     opacity 0.15s;
+}
+
+.kanban-card-main {
+  min-width: 0;
 }
 
 .kanban-card:hover {
@@ -1519,20 +1690,35 @@ function ganttBar(task) {
   border-left: 3px solid #4caf50;
 }
 
+.kanban-card.has-link.has-avatar .kanban-card-top {
+  min-height: 24px;
+  padding-right: 56px;
+}
+
+.kanban-card.has-link:not(.has-avatar) .kanban-card-top,
+.kanban-card.has-avatar:not(.has-link) .kanban-card-top {
+  min-height: 24px;
+  padding-right: 32px;
+}
+
 .kanban-card-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
 }
 
 .kanban-card-actions {
+  position: absolute;
+  top: 10px;
+  right: 12px;
   display: inline-flex;
   align-items: center;
   gap: 2px;
 }
 
 .kanban-card-name {
+  flex: 1;
+  min-width: 0;
   font-size: 13px;
   font-weight: 500;
   line-height: 1.3;
@@ -1587,5 +1773,133 @@ function ganttBar(task) {
   color: #bbb;
   font-size: 12px;
   padding: 20px 0;
+}
+
+:global(.q-tooltip.task-hover-panel) {
+  padding: 0;
+  background: #fce4ec;
+  color: #37474f;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+
+.task-hover {
+  width: 360px;
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #37474f;
+}
+
+.task-hover-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 12px 8px;
+}
+
+.task-hover-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.task-hover-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.task-hover-chip-blocked {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.task-hover-chip-not_started {
+  background: #f5f5f5;
+  color: #616161;
+}
+
+.task-hover-chip-in_progress {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.task-hover-chip-completed {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.task-hover-body {
+  padding: 0 12px 12px;
+}
+
+.task-hover-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 22px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.task-hover-label {
+  flex: 0 0 64px;
+  color: #546e7a;
+  font-size: 11px;
+}
+
+.task-hover-value {
+  flex: 1;
+  min-width: 0;
+  color: #37474f;
+  overflow-wrap: anywhere;
+}
+
+.task-hover-divider {
+  height: 1px;
+  background: rgba(55, 71, 79, 0.12);
+  margin: 8px 0;
+}
+
+.task-hover-section-label {
+  margin: 0 0 2px;
+  color: #546e7a;
+  font-size: 11px;
+}
+
+.task-hover-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: #455a64;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.task-hover-link {
+  display: block;
+  overflow: hidden;
+  color: #546e7a;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
